@@ -68,6 +68,8 @@
   .btn:hover{background:var(--ink);color:var(--raised)}
   .btn.primary{background:var(--ink);color:var(--raised)}
   .btn.primary:hover{background:var(--active)}
+  .btn.recording{background:#c0392b;border-color:#c0392b;color:#fff}
+  .btn.recording:hover{background:#a93226;border-color:#a93226}
   .btn kbd{font-family:var(--mono);font-size:11px;border:1px solid currentColor;
     padding:1px 5px 0;border-radius:2px;opacity:.7;font-weight:500}
   .btn .arrow{display:inline-block;font-size:10px;transform:translateY(-1px)}
@@ -247,6 +249,12 @@
   .help-card dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:8px 18px;font-size:14px;color:var(--ink2)}
   .help-card dt{font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--bg);padding:3px 8px;border-radius:3px;border:1px solid var(--line);justify-self:start}
   .help-card .close{margin-top:18px;display:flex;justify-content:flex-end}
+
+  .record-info-card{max-width:420px}
+  .rec-info-list{margin:0 0 4px;padding:0 0 0 18px;display:flex;flex-direction:column;gap:10px;font-size:14px;color:var(--ink2);line-height:1.5}
+  .rec-info-list li b{color:var(--ink)}
+  .rec-mic-row{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:14px;color:var(--ink);cursor:pointer;user-select:none}
+  .rec-mic-row input{width:14px;height:14px;cursor:pointer;accent-color:var(--ink)}
 
   /* ── Palette picker ─────────────────────────────────────────── */
   .pal-btn-dots{display:flex;gap:3px;align-items:center;height:1em}
@@ -473,6 +481,7 @@
     <span class="toggle-track"><span class="toggle-thumb"></span></span>
     <span class="toggle-label" id="timer-label">Timer</span>
   </label>
+  <button class="btn" id="record-btn" title="Record presentation">&#9679; Record</button>
   <div class="palette-picker" id="palette-picker">
     <button class="btn" id="palette-btn" title="Color theme">
       <span class="pal-btn-dots" id="pal-btn-dots">
@@ -599,6 +608,24 @@
   </div>
 </div>
 
+<div class="help" id="record-modal">
+  <div class="help-card record-info-card">
+    <h3 id="rec-modal-title">Screen recording</h3>
+    <ul class="rec-info-list" id="rec-modal-body">
+      <li>Your browser will ask you to choose a tab, window, or screen to share.</li>
+      <li>Only what you share will be captured — nothing else on your computer.</li>
+      <li>Click <b>Stop</b> in the topbar (or end sharing from the browser bar) to finish.</li>
+      <li>The recording will be downloaded automatically as a <b>.webm</b> file.</li>
+      <li>For best results, share this browser tab in fullscreen presentation mode.</li>
+    </ul>
+    <label class="rec-mic-row">
+      <input type="checkbox" id="rec-mic-check">
+      <span id="rec-mic-label">Include microphone audio</span>
+    </label>
+    <div class="close"><button class="btn primary" id="rec-modal-ok">I understand</button></div>
+  </div>
+</div>
+
 <script>
 /* ─────────────────────────────────────────────────────────────
    demka — text to slides
@@ -674,6 +701,18 @@ const STRINGS = {
     logoSubtitle: '· markdown → slides',
     cardsLabel: 'Cards',
     timerLabel: 'Timer',
+    recordBtn: '&#9679; Record',
+    recordStop: '&#9632; Stop',
+    recordModalTitle: 'Screen recording',
+    recordModalBody: [
+      'Your browser will ask you to choose a tab, window, or screen to share.',
+      'Only what you share will be captured — nothing else on your computer.',
+      'Click <b>Stop</b> in the topbar (or end sharing from the browser bar) to finish.',
+      'The recording will be downloaded automatically as a <b>.webm</b> file.',
+      'For best results, share this browser tab in fullscreen presentation mode.',
+    ],
+    recordModalOk: 'I understand',
+    recordMicLabel: 'Enable microphone audio recording',
     remoteBtn: 'Clicker',
     presentBtn: '&#9654; Present <kbd>F</kbd>',
     presentExit: 'Exit',
@@ -718,6 +757,18 @@ const STRINGS = {
     logoSubtitle: '· markdown → слайди',
     cardsLabel: 'Картки',
     timerLabel: 'Таймер',
+    recordBtn: '&#9679; Запис',
+    recordStop: '&#9632; Стоп',
+    recordModalTitle: 'Запис екрану',
+    recordModalBody: [
+      'Браузер запитає обрати вкладку, вікно або весь екран для запису.',
+      'Буде записано лише те, що ви вибрали — нічого іншого.',
+      'Натисніть <b>Стоп</b> на панелі або завершіть ділитись екраном через браузер.',
+      'Запис автоматично збережеться як <b>.webm</b> файл.',
+      'Для кращого результату поділіться цією вкладкою у повноекранному режимі.',
+    ],
+    recordModalOk: 'Зрозуміло',
+    recordMicLabel: 'Ввімкнути запис аудіо з мікрофона',
     remoteBtn: 'Клікер',
     presentBtn: '&#9654; Презентувати <kbd>F</kbd>',
     presentExit: 'Вийти',
@@ -768,6 +819,11 @@ function applyLang(){
   document.querySelector('.logo small').innerHTML = s.logoSubtitle;
   document.getElementById('cards-label').textContent = s.cardsLabel;
   document.getElementById('timer-label').textContent = s.timerLabel;
+  document.getElementById('rec-modal-title').textContent = s.recordModalTitle;
+  document.getElementById('rec-modal-body').innerHTML = s.recordModalBody.map(t => `<li>${t}</li>`).join('');
+  document.getElementById('rec-modal-ok').textContent = s.recordModalOk;
+  document.getElementById('rec-mic-label').textContent = s.recordMicLabel;
+  document.getElementById('record-btn').innerHTML = _mediaRec ? s.recordStop : s.recordBtn;
   document.getElementById('remote-btn').textContent = s.remoteBtn;
   if (state.present){ presentBtn.textContent = s.presentExit; } else { presentBtn.innerHTML = s.presentBtn; }
   document.querySelectorAll('.lang-opt').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
@@ -1837,6 +1893,71 @@ const timerCheck = $('#timer-check');
 timerCheck.addEventListener('change', () => {
   localStorage.setItem('demka.timer', timerCheck.checked ? 'on' : 'off');
   if (!timerCheck.checked && timerEl) timerEl.style.display = 'none';
+});
+
+// ── Screen recorder ───────────────────────────────────────────
+let _mediaRec = null, _recChunks = [];
+const recordBtn = $('#record-btn');
+const recordModal = $('#record-modal');
+const recModalOk = $('#rec-modal-ok');
+
+recordModal.addEventListener('click', e => { if (e.target === recordModal) recordModal.classList.remove('show'); });
+recModalOk.addEventListener('click', () => { recordModal.classList.remove('show'); startRecording(); });
+
+async function startRecording(){
+  const withMic = document.getElementById('rec-mic-check').checked;
+  let screenStream, micStream, audioCtx;
+  try {
+    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: true });
+  } catch(e) { return; }
+  if (withMic){
+    try { micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch(e) { micStream = null; }
+  }
+
+  // Build final stream: mix screen audio + mic if both available
+  let finalStream;
+  const videoTrack = screenStream.getVideoTracks()[0];
+  const screenAudioTracks = screenStream.getAudioTracks();
+  if (micStream){
+    audioCtx = new AudioContext();
+    const dest = audioCtx.createMediaStreamDestination();
+    if (screenAudioTracks.length)
+      audioCtx.createMediaStreamSource(new MediaStream(screenAudioTracks)).connect(dest);
+    audioCtx.createMediaStreamSource(micStream).connect(dest);
+    finalStream = new MediaStream([videoTrack, ...dest.stream.getAudioTracks()]);
+  } else {
+    finalStream = screenStream;
+  }
+
+  const mimeType = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4']
+    .find(m => MediaRecorder.isTypeSupported(m)) || '';
+  _recChunks = [];
+  _mediaRec = new MediaRecorder(finalStream, mimeType ? { mimeType } : undefined);
+  _mediaRec.ondataavailable = e => { if (e.data.size) _recChunks.push(e.data); };
+  _mediaRec.onstop = () => {
+    const blob = new Blob(_recChunks, { type: _mediaRec.mimeType || 'video/webm' });
+    const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `demka-recording.${ext}`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    screenStream.getTracks().forEach(t => t.stop());
+    micStream?.getTracks().forEach(t => t.stop());
+    audioCtx?.close();
+    _mediaRec = null; _recChunks = [];
+    recordBtn.innerHTML = STRINGS[lang].recordBtn;
+    recordBtn.classList.remove('recording');
+  };
+  videoTrack.onended = () => { if (_mediaRec?.state === 'recording') _mediaRec.stop(); };
+  _mediaRec.start(1000);
+  recordBtn.innerHTML = STRINGS[lang].recordStop;
+  recordBtn.classList.add('recording');
+}
+
+recordBtn.addEventListener('click', () => {
+  if (_mediaRec) { _mediaRec.stop(); return; }
+  recordModal.classList.add('show');
 });
 
 // ── Language switcher ─────────────────────────────────────────
