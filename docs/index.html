@@ -130,6 +130,8 @@
   .node.active li{opacity:0;transform:translateY(6px)}
   .node.active li.shown{opacity:1;transform:translateY(0)}
   .node li::before{content:"";position:absolute;left:2px;top:13px;width:8px;height:1.5px;background:currentColor;opacity:.5}
+  .node li[data-num]{padding-left:0}
+  .node li[data-num]::before{content:attr(data-num) ".";position:static;display:inline;width:auto;height:auto;background:none;font-size:.85em;font-weight:600;opacity:.6;letter-spacing:-.01em;margin-right:5px}
   .node li ul{margin:6px 0 0 10px;gap:4px}
   .node li li{font-size:calc(var(--nfs-body,16px) * 0.9);color:var(--ink2)}
   .node code{font-family:var(--mono);font-size:.88em;background:var(--bg);padding:1px 5px;border-radius:3px;color:var(--ink)}
@@ -367,6 +369,8 @@
     .print-page ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
     .print-page li{font-size:16pt;line-height:1.4;padding:2px 0 2px 24px;position:relative}
     .print-page li::before{content:"";position:absolute;left:4px;top:14px;width:10px;height:2px;background:currentColor;opacity:.5}
+    .print-page li[data-num]{padding-left:0}
+    .print-page li[data-num]::before{content:attr(data-num) ".";position:static;display:inline;width:auto;height:auto;background:none;font-size:.85em;font-weight:600;opacity:.6;margin-right:6px}
     .print-page li ul{margin:6px 0 0 16px;gap:4px}
     .print-page li li{font-size:13pt}
     .print-page .node-footer{margin-top:auto;padding-top:12px;border-top:1px solid var(--line);
@@ -833,12 +837,13 @@ function parseMarkdown(src){
       currentBulletPath = [];
       continue;
     }
-    if ((m = raw.match(/^(\s*)[-*]\s+(.+?)\s*$/))){
+    if ((m = raw.match(/^(\s*)([-*]|\d+\.)\s+(.+?)\s*$/))){
       const indent = m[1].replace(/\t/g,'  ').length;
       const depth = Math.floor(indent / 2);
       const cur = stack[stack.length-1];
       if (cur === root) continue;
-      const bullet = { text: m[2], children:[] };
+      const numMatch = m[2].match(/^(\d+)\.$/);
+      const bullet = { text: m[3], children:[], ...(numMatch ? { num: +numMatch[1] } : {}) };
       if (depth === 0){
         cur.bullets.push(bullet);
         currentBulletPath = [bullet];
@@ -1083,7 +1088,7 @@ function nodeBody(n){
   return `<div class="node-text">${textHtml}</div><div class="node-imgs node-imgs-${cols}">${imgHtml}</div>`;
 }
 function renderBullet(b){
-  let html = `<li>${inlineMd(b.text)}`;
+  let html = `<li${b.num != null ? ` data-num="${b.num}"` : ''}>${inlineMd(b.text)}`;
   if (b.children?.length) html += '<ul>' + b.children.map(renderBullet).join('') + '</ul>';
   return html + '</li>';
 }
