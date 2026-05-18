@@ -129,10 +129,6 @@
   /* progressive reveal scoped to the active node only — peer cards show all bullets */
   .node.active li{opacity:0;transform:translateY(6px)}
   .node.active li.shown{opacity:1;transform:translateY(0)}
-  /* during reveal: dim everything shown except the latest item */
-  .node.active.revealing .lede.shown:not(.reveal-focus),
-  .node.active.revealing li.shown:not(.reveal-focus){opacity:0.35;transition:opacity 220ms var(--ease)}
-  .node.active.revealing .reveal-focus{opacity:1}
   .node li::before{content:"";position:absolute;left:2px;top:13px;width:8px;height:1.5px;background:currentColor;opacity:.5}
   .node li ul{margin:6px 0 0 10px;gap:4px}
   .node li li{font-size:calc(var(--nfs-body,16px) * 0.9);color:var(--ink2)}
@@ -1093,18 +1089,20 @@ function focusOnActive(opts={}){
   applyCam(tx, ty, scale, opts.distance || 0);
 }
 
-function zoomToReveal(){
+function clearRevealHighlight(nodeEl){
+  if (!nodeEl) return;
+  nodeEl.querySelectorAll('li, .lede').forEach(e => { e.style.opacity = ''; });
+}
+
+function zoomToReveal(highlight=true){
   const node = state.nodes[state.activeIdx];
   if (!node?.el) return;
   const { scale: bs } = state.baseCam;
   const zoomScale = bs * 1.12;
   const canvasRect = canvas.getBoundingClientRect();
   const vw = canvasRect.width, vh = canvasRect.height;
-
-  // Horizontal: card center stays on screen center
   const focusX = node.x + node.w / 2;
 
-  // Vertical: measure the last revealed element's actual screen position
   let focusY = node.y + node.h / 2;
   const shownEls = [...node.el.querySelectorAll('.lede.shown, li.shown')];
   if (shownEls.length) {
@@ -1112,10 +1110,10 @@ function zoomToReveal(){
     const tRect = target.getBoundingClientRect();
     const screenY = tRect.top + tRect.height / 2 - canvasRect.top;
     focusY = (screenY - state.cam.y) / state.cam.scale;
-    // mark focus highlight
-    node.el.classList.add('revealing');
-    shownEls.forEach(e => e.classList.remove('reveal-focus'));
-    target.classList.add('reveal-focus');
+    if (highlight){
+      shownEls.forEach(e => { e.style.opacity = '0.35'; });
+      target.style.opacity = '1';
+    }
   }
 
   applyCam(vw / 2 - focusX * zoomScale, vh / 2 - focusY * zoomScale, zoomScale, 0);
@@ -1140,12 +1138,7 @@ function goTo(idx, opts={}){
   if (!state.nodes.length) return;
   idx = Math.max(0, Math.min(state.nodes.length-1, idx));
   const prev = state.activeIdx;
-  // clear reveal highlight from the node we're leaving
-  const prevNode = state.nodes[prev];
-  if (prevNode?.el){
-    prevNode.el.classList.remove('revealing');
-    prevNode.el.querySelectorAll('.reveal-focus').forEach(e => e.classList.remove('reveal-focus'));
-  }
+  clearRevealHighlight(state.nodes[prev]?.el);
   const distance = Math.abs(idx - prev);
   if (prev !== idx && state.nodes[prev]) state.visited.add(state.nodes[prev].id);
   state.activeIdx = idx;
@@ -1171,6 +1164,17 @@ function advance(){
   if (state.activeIdx < state.nodes.length - 1) goTo(state.activeIdx + 1);
 }
 function back(){
+  const cur = state.nodes[state.activeIdx];
+  if (!cur) return;
+  if (state.bulletsShown > 0){
+    state.bulletsShown--;
+    updateActive();
+    updateNavButtons();
+    clearRevealHighlight(cur.el);
+    if (state.bulletsShown > 0) zoomToReveal(false);
+    else focusOnActive({ distance:0 });
+    return;
+  }
   if (state.activeIdx > 0) goTo(state.activeIdx - 1, { reveal:'all' });
 }
 
