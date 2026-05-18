@@ -411,6 +411,9 @@
     /* Hide minimap — too cramped at 30vh */
     .minimap{display:none}
 
+    /* Counter: push to very bottom so it clears the card */
+    .counter{bottom:4px;right:50%;transform:translateX(50%);font-size:12px;padding:5px 10px}
+
     /* Nav arrows: slimmer */
     .nav-chev{width:28px;height:44px}
     .nav-chev svg{width:20px;height:20px}
@@ -1074,7 +1077,7 @@ function focusOnActive(opts={}){
   const rect = canvas.getBoundingClientRect();
   const vw = rect.width, vh = rect.height;
   const mobile = window.innerWidth <= 640;
-  const pad = mobile ? 20 : (state.present ? 80 : 100);
+  const pad = mobile ? 52 : (state.present ? 80 : 100);
   let scale = Math.min(vw / (node.w + pad*2), vh / (node.h + pad*2));
   if (!state.present) scale = Math.min(scale, 1.05);
   scale = Math.max(scale, 0.5);
