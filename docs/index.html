@@ -149,19 +149,16 @@
     display:flex;flex-direction:column;overflow:hidden}
   .node.node-split .node-footer{margin-top:auto;padding-top:10px;border-top:1px solid var(--line)}
   .node.node-split .node-imgs{flex:0 0 45%;min-width:0;display:grid;gap:3px;overflow:hidden;border-radius:0 7px 7px 0}
-  /* image-only: full card grid with bottom caption */
-  .node.node-img-only{flex-direction:column;padding:0;overflow:hidden}
-  .node.node-img-only.active{padding:0}
-  .node.node-img-only .node-imgs{flex:1;min-height:0;display:grid;gap:3px;overflow:hidden;border-radius:7px 7px 0 0}
-  .img-caption{flex:0 0 auto;padding:6px var(--node-pad-h,26px);margin:0;display:flex;align-items:center}
-  .img-caption h1,.img-caption h2,.img-caption h3{margin:0;font-size:var(--nfs-h3,20px);font-weight:600}
-  .node.node-img-only .node-footer{padding:0 var(--node-pad-h,26px) 6px;border-top:none;margin-top:0}
+  /* image-only: normal padding, heading at top, image grid below */
+  .node.node-img-only{flex-direction:column}
+  .node.node-img-only .node-imgs{flex:1;min-height:0;display:grid;gap:4px;overflow:hidden;margin-top:10px;grid-auto-rows:1fr;align-content:stretch}
   /* grid columns */
   .node-imgs.node-imgs-1{grid-template-columns:1fr}
   .node-imgs.node-imgs-2{grid-template-columns:1fr 1fr}
   .node-imgs.node-imgs-3{grid-template-columns:repeat(3,1fr)}
-  /* images fill their cell */
-  .node-imgs img{width:100%;height:100%;object-fit:cover;display:block}
+  /* split: images cover their cell; image-only: contain + center */
+  .node-split .node-imgs img{width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none;user-select:none}
+  .node-img-only .node-imgs img{width:100%;height:100%;min-height:0;min-width:0;object-fit:contain;object-position:center;display:block;-webkit-user-drag:none;user-select:none}
   /* multi-image grids: equal rows */
   .node-imgs.node-imgs-2,.node-imgs.node-imgs-3{grid-auto-rows:1fr}
 
@@ -378,10 +375,9 @@
     .print-page.node-split{flex-direction:row;padding:0}
     .print-page.node-split .node-text{flex:1;padding:64px 80px}
     .print-page.node-split .node-imgs{flex:0 0 45%;display:grid;gap:3px}
-    .print-page.node-img-only{padding:0}
-    .print-page.node-img-only .node-imgs{flex:1;display:grid;gap:3px}
-    .print-page .img-caption{padding:12px 80px}
-    .print-page .node-imgs img{width:100%;height:100%;object-fit:cover}
+    .print-page.node-split .node-imgs img{width:100%;height:100%;object-fit:cover}
+    .print-page.node-img-only .node-imgs{flex:1;min-height:0;display:grid;gap:4px;margin-top:10px}
+    .print-page.node-img-only .node-imgs img{width:100%;height:100%;object-fit:contain;object-position:center}
     .print-page .node-imgs.node-imgs-1{grid-template-columns:1fr}
     .print-page .node-imgs.node-imgs-2{grid-template-columns:1fr 1fr;grid-auto-rows:1fr}
     .print-page .node-imgs.node-imgs-3{grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr}
@@ -1055,15 +1051,15 @@ function nodeBody(n){
   const hasText = !!(n.lede || n.bullets.length || n.code);
 
   if (imgs.length && !hasText){
-    // image-only layout: full-card grid with heading as caption
+    // image-only layout: heading at top, image grid below (no crop)
     const cols = imgs.length === 1 ? 1 : imgs.length === 2 ? 2 : 3;
     const imgHtml = imgs.map(img => {
       const s = safeImgSrc(img.src);
       if (!s) return '';
-      return `<img src="${s}" alt="${esc(img.alt)}" loading="lazy" />`;
+      return `<img src="${s}" alt="${esc(img.alt)}" loading="lazy" draggable="false" />`;
     }).join('');
-    let html = `<div class="node-imgs node-imgs-${cols}">${imgHtml}</div>`;
-    html += `<p class="img-caption"><${tag}>${inlineMd(n.text)}</${tag}></p>`;
+    let html = `<${tag}>${inlineMd(n.text)}</${tag}>`;
+    html += `<div class="node-imgs node-imgs-${cols}">${imgHtml}</div>`;
     if (state.footer) html += `<p class="node-footer">${esc(state.footer)}</p>`;
     return html;
   }
@@ -1082,7 +1078,7 @@ function nodeBody(n){
   const imgHtml = imgs.map(img => {
     const s = safeImgSrc(img.src);
     if (!s) return '';
-    return `<img src="${s}" alt="${esc(img.alt)}" loading="lazy" />`;
+    return `<img src="${s}" alt="${esc(img.alt)}" loading="lazy" draggable="false" />`;
   }).join('');
   return `<div class="node-text">${textHtml}</div><div class="node-imgs node-imgs-${cols}">${imgHtml}</div>`;
 }
