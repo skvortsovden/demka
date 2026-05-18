@@ -304,7 +304,6 @@
 <header class="topbar">
   <div class="logo"><span class="dot"></span>demka <small>· markdown → slides</small></div>
   <div class="spacer"></div>
-  <div class="meta"><b id="filename">new-demka.md</b> · <span id="node-count">0 nodes</span> · <span id="char-count">0 chars</span></div>
   <label class="toggle-sw" title="Toggle card borders">
     <input type="checkbox" id="cards-check" checked>
     <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -321,11 +320,11 @@
     <div class="palette-popup" id="palette-popup"></div>
   </div>
   <button class="btn" id="remote-btn" title="Phone remote">Clicker</button>
-  <button class="btn" id="help-btn" title="Keyboard shortcuts">?</button>
   <div class="lang-switcher" id="lang-switcher">
     <button class="lang-opt" data-lang="en">English</button>
     <button class="lang-opt" data-lang="uk">Українська</button>
   </div>
+  <button class="btn" id="help-btn" title="Keyboard shortcuts">?</button>
   <button class="btn primary" id="present-btn">&#9654; Present <kbd>F</kbd></button>
 </header>
 
@@ -484,8 +483,6 @@ const empty       = $('#empty');
 const presentBtn  = $('#present-btn');
 const minimap     = $('#minimap');
 const mmSvg       = $('#mm-svg');
-const nodeCount   = $('#node-count');
-const charCount   = $('#char-count');
 const saveLabel   = $('#save-label');
 const editorPane  = $('#editor-pane');
 const helpEl      = $('#help');
@@ -530,8 +527,6 @@ const STRINGS = {
       ['End', 'Jump to last node'],
       ['?', 'Show this'],
     ],
-    nodes: n => `${n} node${n===1?'':'s'}`,
-    chars: n => `${n} chars`,
   },
   uk: {
     logoSubtitle: '· markdown → слайди',
@@ -570,13 +565,6 @@ const STRINGS = {
       ['End', 'До кінця'],
       ['?', 'Показати це'],
     ],
-    nodes: n => {
-      const m = n % 10, h = n % 100;
-      if (m===1 && h!==11) return `${n} вузол`;
-      if (m>=2 && m<=4 && (h<10||h>=20)) return `${n} вузли`;
-      return `${n} вузлів`;
-    },
-    chars: n => `${n} симв`,
   },
 };
 let lang = localStorage.getItem('demka.lang') || 'en';
@@ -605,10 +593,6 @@ function applyLang(){
   document.querySelector('.help-card h3').textContent = s.helpTitle;
   document.getElementById('help-close').textContent = s.helpGotIt;
   document.querySelector('.help-card dl').innerHTML = s.helpRows.map(([k,d]) => `<dt>${k}</dt><dd>${d}</dd>`).join('');
-  if (state.nodes.length){
-    nodeCount.textContent = s.nodes(state.nodes.length);
-    charCount.textContent = s.chars(editor.value.length);
-  }
 }
 
 // ── Front matter parser ──────────────────────────────────────
@@ -1043,8 +1027,6 @@ function doRebuild(){
     counter.style.display = 'none';
     world.style.transform = 'translate(0,0) scale(1)';
   }
-  nodeCount.textContent = STRINGS[lang].nodes(state.nodes.length);
-  charCount.textContent = STRINGS[lang].chars(src.length);
   updateNavButtons();
 }
 
