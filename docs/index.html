@@ -177,6 +177,16 @@
   .counter .of{color:var(--ink2);margin:0 3px}
   .counter .reveal{margin-left:8px;color:var(--mute);font-size:11px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em}
 
+  .timer{position:absolute;right:16px;top:16px;font:600 14px/1.7 var(--font);color:var(--ink);
+    background:var(--surface);border:1px solid var(--ink2);padding:9px 14px;border-radius:3px;
+    z-index:5;letter-spacing:.02em;font-variant-numeric:tabular-nums;display:none;
+    flex-direction:column;gap:0}
+  .timer .t-label{font-size:10px;font-family:var(--mono);color:var(--mute);text-transform:uppercase;letter-spacing:.08em;line-height:1.2;margin-bottom:1px}
+  .timer .t-val{font-size:14px;color:var(--ink)}
+  .timer .t-slide{margin-top:6px}
+  body.present .timer{background:transparent;border-color:transparent;color:var(--mute)}
+  body.present .timer .t-val{color:var(--mute)}
+
   /* Navigation chevrons */
   .nav-chev{position:absolute;top:50%;transform:translateY(-50%);
     width:36px;height:64px;display:flex;align-items:center;justify-content:center;
@@ -458,6 +468,11 @@
     <span class="toggle-track"><span class="toggle-thumb"></span></span>
     <span class="toggle-label" id="cards-label">Cards</span>
   </label>
+  <label class="toggle-sw" title="Show/hide timer">
+    <input type="checkbox" id="timer-check">
+    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+    <span class="toggle-label" id="timer-label">Timer</span>
+  </label>
   <div class="palette-picker" id="palette-picker">
     <button class="btn" id="palette-btn" title="Color theme">
       <span class="pal-btn-dots" id="pal-btn-dots">
@@ -521,6 +536,13 @@
     <div class="counter" id="counter" style="display:none">
       <span id="counter-cur">1</span><span class="of">/</span><span id="counter-tot">1</span>
       <span class="reveal" id="counter-reveal"></span>
+    </div>
+
+    <div class="timer" id="timer">
+      <div class="t-label">total</div>
+      <div class="t-val" id="timer-total">00:00:00</div>
+      <div class="t-label t-slide">slide</div>
+      <div class="t-val" id="timer-slide">00:00:00</div>
     </div>
 
     <div class="empty" id="empty" style="display:none">
@@ -651,6 +673,7 @@ const STRINGS = {
   en: {
     logoSubtitle: '· markdown → slides',
     cardsLabel: 'Cards',
+    timerLabel: 'Timer',
     remoteBtn: 'Clicker',
     presentBtn: '&#9654; Present <kbd>F</kbd>',
     presentExit: 'Exit',
@@ -694,6 +717,7 @@ const STRINGS = {
   uk: {
     logoSubtitle: '· markdown → слайди',
     cardsLabel: 'Картки',
+    timerLabel: 'Таймер',
     remoteBtn: 'Клікер',
     presentBtn: '&#9654; Презентувати <kbd>F</kbd>',
     presentExit: 'Вийти',
@@ -743,6 +767,7 @@ function applyLang(){
   const s = STRINGS[lang];
   document.querySelector('.logo small').innerHTML = s.logoSubtitle;
   document.getElementById('cards-label').textContent = s.cardsLabel;
+  document.getElementById('timer-label').textContent = s.timerLabel;
   document.getElementById('remote-btn').textContent = s.remoteBtn;
   if (state.present){ presentBtn.textContent = s.presentExit; } else { presentBtn.innerHTML = s.presentBtn; }
   document.querySelectorAll('.lang-opt').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
@@ -1203,6 +1228,7 @@ function goTo(idx, opts={}){
   const distance = Math.abs(idx - prev);
   if (prev !== idx && state.nodes[prev]) state.visited.add(state.nodes[prev].id);
   state.activeIdx = idx;
+  if (state.present && prev !== idx) timerResetSlide();
   const cur = state.nodes[idx];
   state.bulletsShown = opts.reveal === 'all' ? totalRevealSteps(cur) : 0;
   updateActive();
@@ -1350,6 +1376,42 @@ function load(){
 }
 
 // ── Present mode ─────────────────────────────────────────────
+// ── Presentation timer ────────────────────────────────────────
+const timerEl     = document.getElementById('timer');
+const timerTotalEl = document.getElementById('timer-total');
+const timerSlideEl = document.getElementById('timer-slide');
+let _timerTotal = 0, _timerSlide = 0, _timerInterval = null;
+
+function fmtTime(s){
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(ss).padStart(2,'0');
+}
+function timerTick(){
+  _timerTotal++;
+  _timerSlide++;
+  timerTotalEl.textContent = fmtTime(_timerTotal);
+  timerSlideEl.textContent = fmtTime(_timerSlide);
+}
+function timerStart(){
+  _timerTotal = 0; _timerSlide = 0;
+  timerTotalEl.textContent = '00:00:00';
+  timerSlideEl.textContent = '00:00:00';
+  if (timerCheck.checked && document.fullscreenElement) timerEl.style.display = 'flex';
+  clearInterval(_timerInterval);
+  _timerInterval = setInterval(timerTick, 1000);
+}
+function timerStop(){
+  clearInterval(_timerInterval);
+  _timerInterval = null;
+  timerEl.style.display = 'none';
+}
+function timerResetSlide(){
+  _timerSlide = 0;
+  timerSlideEl.textContent = '00:00:00';
+}
+
 function togglePresent(){
   state.present = !state.present;
   document.body.classList.toggle('present', state.present);
@@ -1359,9 +1421,11 @@ function togglePresent(){
     presentBtn.textContent = STRINGS[lang].presentExit;
     showHint();
     document.documentElement.requestFullscreen?.().catch(()=>{});
+    timerStart();
   } else {
     presentBtn.innerHTML = STRINGS[lang].presentBtn;
     document.fullscreenElement && document.exitFullscreen?.().catch(()=>{});
+    timerStop();
   }
   updateActive();
   focusOnActive({ distance:1 });
@@ -1460,6 +1524,13 @@ document.addEventListener('fullscreenchange', ()=>{
     presentBtn.innerHTML = STRINGS[lang].presentBtn;
     focusOnActive({ distance:1 });
     updateActive();
+    timerStop();
+  }
+  if (document.fullscreenElement && state.present && timerCheck.checked){
+    timerEl.style.display = 'flex';
+  }
+  if (!document.fullscreenElement){
+    timerEl.style.display = 'none';
   }
 });
 
@@ -1755,6 +1826,17 @@ const cardsCheck = $('#cards-check');
 cardsCheck.addEventListener('change', () => {
   document.body.classList.toggle('no-cards', !cardsCheck.checked);
   localStorage.setItem('demka.cards', cardsCheck.checked ? 'on' : 'off');
+});
+
+// ── Timer toggle ──────────────────────────────────────────────
+const timerCheck = $('#timer-check');
+(function initTimerToggle(){
+  const on = localStorage.getItem('demka.timer') === 'on';
+  if (on) timerCheck.checked = true;
+})();
+timerCheck.addEventListener('change', () => {
+  localStorage.setItem('demka.timer', timerCheck.checked ? 'on' : 'off');
+  if (!timerCheck.checked && timerEl) timerEl.style.display = 'none';
 });
 
 // ── Language switcher ─────────────────────────────────────────
