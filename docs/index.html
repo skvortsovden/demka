@@ -285,6 +285,15 @@
   .toggle-sw input:checked ~ .toggle-track .toggle-thumb{transform:translateX(13px)}
   .toggle-label{font:600 13px/1 var(--font);color:var(--ink);letter-spacing:.02em}
 
+  .lang-switcher{display:inline-flex;border:1px solid var(--ink);border-radius:3px;overflow:hidden;flex-shrink:0}
+  .lang-opt{appearance:none;border:0;border-right:1px solid var(--ink);background:var(--surface);
+    color:var(--ink2);font:600 13px/1 var(--font);letter-spacing:.02em;
+    padding:9px 12px;cursor:pointer;
+    transition:background 120ms var(--ease),color 120ms var(--ease)}
+  .lang-opt:last-child{border-right:0}
+  .lang-opt:hover:not(.active){background:var(--bg)}
+  .lang-opt.active{background:var(--ink);color:var(--raised)}
+
   @media (max-width: 780px){
     .editor-pane{width:46%;min-width:240px}
   }
@@ -299,7 +308,7 @@
   <label class="toggle-sw" title="Toggle card borders">
     <input type="checkbox" id="cards-check" checked>
     <span class="toggle-track"><span class="toggle-thumb"></span></span>
-    <span class="toggle-label">Cards</span>
+    <span class="toggle-label" id="cards-label">Cards</span>
   </label>
   <div class="palette-picker" id="palette-picker">
     <button class="btn" id="palette-btn" title="Color theme">
@@ -313,13 +322,17 @@
   </div>
   <button class="btn" id="remote-btn" title="Phone remote">Clicker</button>
   <button class="btn" id="help-btn" title="Keyboard shortcuts">?</button>
+  <div class="lang-switcher" id="lang-switcher">
+    <button class="lang-opt" data-lang="en">English</button>
+    <button class="lang-opt" data-lang="uk">Українська</button>
+  </div>
   <button class="btn primary" id="present-btn">&#9654; Present <kbd>F</kbd></button>
 </header>
 
 <main class="stage">
   <section class="editor-pane" id="editor-pane">
     <div class="ed-head">
-      <span>editor · markdown</span>
+      <span id="ed-head-label">editor · markdown</span>
       <span class="save-state"><span class="pulse"></span><span id="save-label">saved</span></span>
     </div>
     <textarea id="editor" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="# Start typing markdown…
@@ -368,7 +381,7 @@
   <div class="remote-card">
     <h3>Clicker</h3>
     <div class="remote-qr" id="remote-qr">
-      <span style="color:var(--mute);font-size:12px;font-family:var(--mono)">loading…</span>
+      <span id="remote-loading-text" style="color:var(--mute);font-size:12px;font-family:var(--mono)">loading…</span>
     </div>
     <div class="remote-session-id" id="remote-session-id"></div>
     <div class="remote-status-row">
@@ -413,7 +426,8 @@
    Single static file. No build step. GitHub Pages deployable.
    ───────────────────────────────────────────────────────────── */
 
-const EXAMPLE = `
+const EXAMPLES = {
+  en: `
 footer: demka
 ---
 
@@ -431,7 +445,27 @@ it is a simple text to slides generator
 
 - parse markdown into a node tree
 - camera pans + zooms between them
-- bullets reveal one at a time`;
+- bullets reveal one at a time`,
+  uk: `
+footer: демка
+---
+
+# демка
+
+простий генератор слайдів із тексту
+
+## чому демка
+
+- мінімалістичний
+- безкоштовний
+- нічого не треба встановлювати
+
+## як це працює
+
+- парсить markdown у дерево вузлів
+- камера панорамує між ними
+- пункти розкриваються по одному`,
+};
 
 const $ = sel => document.querySelector(sel);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
@@ -456,6 +490,126 @@ const saveLabel   = $('#save-label');
 const editorPane  = $('#editor-pane');
 const helpEl      = $('#help');
 const presentHint = $('#present-hint');
+
+// ── i18n ─────────────────────────────────────────────────────
+const STRINGS = {
+  en: {
+    logoSubtitle: '· markdown → slides',
+    cardsLabel: 'Cards',
+    remoteBtn: 'Clicker',
+    presentBtn: '&#9654; Present <kbd>F</kbd>',
+    presentExit: 'Exit',
+    editorHead: 'editor · markdown',
+    saveSaved: 'saved',
+    saveEditing: 'editing…',
+    emptyTitle: 'Start typing markdown in the editor.',
+    emptyDesc: 'Headings become nodes. Bullets reveal one-by-one when you present.',
+    emptyKbd: '<kbd>Space</kbd>or<kbd>&#8594;</kbd>next · <kbd>F</kbd>present · <kbd>?</kbd>help',
+    presentHint: 'Press <b>Esc</b> to exit · <b>Space</b> next · <b>&#8592;/&#8594;</b> navigate',
+    remoteTitle: 'Clicker',
+    remoteWaiting: 'Waiting for phone…',
+    remoteConnected: 'Phone connected',
+    remoteDisconnected: 'Disconnected — rescan to reconnect',
+    remotePeerFail: 'Failed to load PeerJS',
+    remoteNotAvail: 'Not available on file://',
+    remoteFileMsg: 'Remote requires<br>HTTP/HTTPS.<br>Open via demka.in.ua',
+    remoteClose: 'Close',
+    remoteLoading: 'loading…',
+    phoneConnecting: 'Connecting…',
+    phoneConnected: 'Connected',
+    phoneDisconnected: 'Disconnected',
+    helpTitle: 'demka — keyboard shortcuts',
+    helpGotIt: 'Got it',
+    helpRows: [
+      ['F', 'Enter / exit presentation'],
+      ['Esc', 'Exit presentation'],
+      ['Space · →', 'Next bullet, then next node (depth-first)'],
+      ['←', 'Previous node (all bullets shown)'],
+      ['↑ · ↓', 'Up / down in tree'],
+      ['Home', 'Jump to root'],
+      ['End', 'Jump to last node'],
+      ['?', 'Show this'],
+    ],
+    nodes: n => `${n} node${n===1?'':'s'}`,
+    chars: n => `${n} chars`,
+  },
+  uk: {
+    logoSubtitle: '· markdown → слайди',
+    cardsLabel: 'Картки',
+    remoteBtn: 'Клікер',
+    presentBtn: '&#9654; Презентація <kbd>F</kbd>',
+    presentExit: 'Вийти',
+    editorHead: 'редактор · markdown',
+    saveSaved: 'збережено',
+    saveEditing: 'редагування…',
+    emptyTitle: 'Почніть вводити markdown у редакторі.',
+    emptyDesc: 'Заголовки стають вузлами. Пункти розкриваються по одному під час презентації.',
+    emptyKbd: '<kbd>Space</kbd>або<kbd>&#8594;</kbd>далі · <kbd>F</kbd>показ · <kbd>?</kbd>довідка',
+    presentHint: 'Натисніть <b>Esc</b> для виходу · <b>Space</b> далі · <b>&#8592;/&#8594;</b> навігація',
+    remoteTitle: 'Клікер',
+    remoteWaiting: 'Очікування зʼєднання з телефоном…',
+    remoteConnected: 'Телефон підключено',
+    remoteDisconnected: 'Відключено — відскануйте код знову',
+    remotePeerFail: 'Помилка завантаження PeerJS',
+    remoteNotAvail: 'Недоступно на file://',
+    remoteFileMsg: 'Потрібен<br>HTTP/HTTPS.<br>Відкрийте через demka.in.ua',
+    remoteClose: 'Закрити',
+    remoteLoading: 'завантаження…',
+    phoneConnecting: 'Підключення…',
+    phoneConnected: 'Підключено',
+    phoneDisconnected: 'Відключено',
+    helpTitle: 'демка — комбінації клавіш',
+    helpGotIt: 'Зрозуміло',
+    helpRows: [
+      ['F', 'Увійти / вийти з презентації'],
+      ['Esc', 'Вийти з презентації'],
+      ['Space · →', 'Наступний пункт, потім наступний вузол'],
+      ['←', 'Попередній вузол (усі пункти показані)'],
+      ['↑ · ↓', 'Вгору / вниз по дереву'],
+      ['Home', 'До початку'],
+      ['End', 'До кінця'],
+      ['?', 'Показати це'],
+    ],
+    nodes: n => {
+      const m = n % 10, h = n % 100;
+      if (m===1 && h!==11) return `${n} вузол`;
+      if (m>=2 && m<=4 && (h<10||h>=20)) return `${n} вузли`;
+      return `${n} вузлів`;
+    },
+    chars: n => `${n} симв`,
+  },
+};
+let lang = localStorage.getItem('demka.lang') || 'en';
+let remoteStatusKey = 'remoteWaiting';
+let phoneStatusKey  = 'phoneConnecting';
+
+function applyLang(){
+  const s = STRINGS[lang];
+  document.querySelector('.logo small').innerHTML = s.logoSubtitle;
+  document.getElementById('cards-label').textContent = s.cardsLabel;
+  document.getElementById('remote-btn').textContent = s.remoteBtn;
+  if (state.present){ presentBtn.textContent = s.presentExit; } else { presentBtn.innerHTML = s.presentBtn; }
+  document.querySelectorAll('.lang-opt').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+  document.getElementById('ed-head-label').textContent = s.editorHead;
+  if (!editorPane.classList.contains('dirty')) saveLabel.textContent = s.saveSaved;
+  document.querySelector('.empty h3').textContent = s.emptyTitle;
+  document.querySelector('.empty p').textContent = s.emptyDesc;
+  document.querySelector('.empty .kbd-row').innerHTML = s.emptyKbd;
+  presentHint.innerHTML = s.presentHint;
+  document.querySelector('.remote-card h3').textContent = s.remoteTitle;
+  document.getElementById('remote-close').textContent = s.remoteClose;
+  document.getElementById('remote-status-text').textContent = s[remoteStatusKey];
+  const loadingEl = document.getElementById('remote-loading-text');
+  if (loadingEl) loadingEl.textContent = s.remoteLoading;
+  document.getElementById('phone-status-text').textContent = s[phoneStatusKey];
+  document.querySelector('.help-card h3').textContent = s.helpTitle;
+  document.getElementById('help-close').textContent = s.helpGotIt;
+  document.querySelector('.help-card dl').innerHTML = s.helpRows.map(([k,d]) => `<dt>${k}</dt><dd>${d}</dd>`).join('');
+  if (state.nodes.length){
+    nodeCount.textContent = s.nodes(state.nodes.length);
+    charCount.textContent = s.chars(editor.value.length);
+  }
+}
 
 // ── Front matter parser ──────────────────────────────────────
 // Extracts key: value lines before the first --- separator.
@@ -865,9 +1019,9 @@ function updateMinimap(){
 let rebuildTimer = null;
 function scheduleRebuild(){
   editorPane.classList.add('dirty');
-  saveLabel.textContent = 'editing…';
+  saveLabel.textContent = STRINGS[lang].saveEditing;
   clearTimeout(rebuildTimer);
-  rebuildTimer = setTimeout(()=>{ doRebuild(); save(); editorPane.classList.remove('dirty'); saveLabel.textContent = 'saved'; }, 280);
+  rebuildTimer = setTimeout(()=>{ doRebuild(); save(); editorPane.classList.remove('dirty'); saveLabel.textContent = STRINGS[lang].saveSaved; }, 280);
 }
 
 function doRebuild(){
@@ -889,8 +1043,8 @@ function doRebuild(){
     counter.style.display = 'none';
     world.style.transform = 'translate(0,0) scale(1)';
   }
-  nodeCount.textContent = `${state.nodes.length} node${state.nodes.length===1?'':'s'}`;
-  charCount.textContent = `${src.length} chars`;
+  nodeCount.textContent = STRINGS[lang].nodes(state.nodes.length);
+  charCount.textContent = STRINGS[lang].chars(src.length);
   updateNavButtons();
 }
 
@@ -909,7 +1063,7 @@ function load(){
     const s = localStorage.getItem(STORAGE_KEY);
     if (s !== null && s.length) return s;
   }catch(e){}
-  return EXAMPLE;
+  return EXAMPLES[lang] || EXAMPLES.en;
 }
 
 // ── Present mode ─────────────────────────────────────────────
@@ -919,11 +1073,11 @@ function togglePresent(){
   if (state.present){
     state.bulletsShown = 0;
     state.visited.clear();
-    presentBtn.textContent = 'Exit';
+    presentBtn.textContent = STRINGS[lang].presentExit;
     showHint();
     document.documentElement.requestFullscreen?.().catch(()=>{});
   } else {
-    presentBtn.innerHTML = '&#9654; Present <kbd>F</kbd>';
+    presentBtn.innerHTML = STRINGS[lang].presentBtn;
     document.fullscreenElement && document.exitFullscreen?.().catch(()=>{});
   }
   updateActive();
@@ -993,7 +1147,7 @@ document.addEventListener('fullscreenchange', ()=>{
   if (!document.fullscreenElement && state.present){
     state.present = false;
     document.body.classList.remove('present');
-    presentBtn.innerHTML = '&#9654; Present <kbd>F</kbd>';
+    presentBtn.innerHTML = STRINGS[lang].presentBtn;
     focusOnActive({ distance:1 });
     updateActive();
   }
@@ -1007,7 +1161,7 @@ function loadPeerJS(cb){
   const s = document.createElement('script');
   s.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
   s.onload = cb;
-  s.onerror = () => { $('#remote-status-text').textContent = 'Failed to load PeerJS'; };
+  s.onerror = () => { remoteStatusKey = 'remotePeerFail'; $('#remote-status-text').textContent = STRINGS[lang].remotePeerFail; };
   document.head.appendChild(s);
 }
 
@@ -1016,8 +1170,9 @@ function remoteUID(){ return 'demka-' + Math.random().toString(36).slice(2,8); }
 function openRemoteModal(){
   $('#remote-modal').classList.add('show');
   if (location.protocol === 'file:'){
-    $('#remote-qr').innerHTML = '<span style="color:var(--mute);font-size:12px;font-family:var(--mono);line-height:1.5;text-align:center;display:block">Remote requires<br>HTTP/HTTPS.<br>Open via skvortsovden.github.io<br>/demka</span>';
-    $('#remote-status-text').textContent = 'Not available on file://';
+    $('#remote-qr').innerHTML = `<span style="color:var(--mute);font-size:12px;font-family:var(--mono);line-height:1.5;text-align:center;display:block">${STRINGS[lang].remoteFileMsg}</span>`;
+    remoteStatusKey = 'remoteNotAvail';
+    $('#remote-status-text').textContent = STRINGS[lang].remoteNotAvail;
     return;
   }
   if (remotePeer) return;
@@ -1031,11 +1186,13 @@ function openRemoteModal(){
     });
     remotePeer.on('connection', conn => {
       $('#remote-dot').classList.add('on');
-      $('#remote-status-text').textContent = 'Phone connected';
+      remoteStatusKey = 'remoteConnected';
+      $('#remote-status-text').textContent = STRINGS[lang].remoteConnected;
       conn.on('data', d => { if (d==='next') advance(); else if (d==='prev') back(); });
       conn.on('close', () => {
         $('#remote-dot').classList.remove('on');
-        $('#remote-status-text').textContent = 'Disconnected — rescan to reconnect';
+        remoteStatusKey = 'remoteDisconnected';
+        $('#remote-status-text').textContent = STRINGS[lang].remoteDisconnected;
       });
     });
     remotePeer.on('error', err => { $('#remote-status-text').textContent = 'Error: ' + err.type; });
@@ -1055,6 +1212,7 @@ window.addEventListener('beforeunload', () => { if (remotePeer) remotePeer.destr
   const hostId = new URLSearchParams(location.search).get('remote');
   if (!hostId) return;
   document.body.classList.add('phone-mode');
+  $('#phone-status-text').textContent = STRINGS[lang].phoneConnecting;
   loadPeerJS(() => {
     const peer = new Peer();
     peer.on('open', () => {
@@ -1064,7 +1222,8 @@ window.addEventListener('beforeunload', () => { if (remotePeer) remotePeer.destr
         if (marked) return;
         marked = true;
         $('#phone-dot').classList.add('on');
-        $('#phone-status-text').textContent = 'Connected';
+        phoneStatusKey = 'phoneConnected';
+        $('#phone-status-text').textContent = STRINGS[lang].phoneConnected;
       }
       conn.on('open', markConnected);
       // fallback poll — 'open' sometimes fires before handler is attached
@@ -1073,7 +1232,8 @@ window.addEventListener('beforeunload', () => { if (remotePeer) remotePeer.destr
       conn.on('close', () => {
         marked = false;
         $('#phone-dot').classList.remove('on');
-        $('#phone-status-text').textContent = 'Disconnected';
+        phoneStatusKey = 'phoneDisconnected';
+        $('#phone-status-text').textContent = STRINGS[lang].phoneDisconnected;
       });
       $('#phone-next').addEventListener('click', () => { if (conn.open) conn.send('next'); });
       $('#phone-prev').addEventListener('click', () => { if (conn.open) conn.send('prev'); });
@@ -1154,6 +1314,22 @@ const cardsCheck = $('#cards-check');
 cardsCheck.addEventListener('change', () => {
   document.body.classList.toggle('no-cards', !cardsCheck.checked);
   localStorage.setItem('demka.cards', cardsCheck.checked ? 'on' : 'off');
+});
+
+// ── Language switcher ─────────────────────────────────────────
+(function initLang(){ applyLang(); })();
+$$('.lang-opt').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const prev = lang;
+    lang = btn.dataset.lang;
+    localStorage.setItem('demka.lang', lang);
+    if (editor.value.trim() === EXAMPLES[prev].trim()){
+      editor.value = EXAMPLES[lang];
+      localStorage.removeItem('demka.md');
+      doRebuild();
+    }
+    applyLang();
+  });
 });
 
 // ── Init ─────────────────────────────────────────────────────
