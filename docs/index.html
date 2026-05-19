@@ -261,6 +261,25 @@
   .rec-mic-row{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:14px;color:var(--ink);cursor:pointer;user-select:none}
   .rec-mic-row input{width:14px;height:14px;cursor:pointer;accent-color:var(--ink)}
 
+  /* ── Share modal ─────────────────────────────────────────── */
+  .share-card{max-width:400px}
+  .share-card h3{margin:0 0 12px;font-weight:700;font-size:18px}
+  .share-card p{font-size:14px;color:var(--ink2);margin:0 0 12px;line-height:1.6}
+  .share-btns{display:flex;gap:8px;justify-content:flex-end}
+  .share-url-row{display:flex;gap:6px;margin:12px 0 18px;align-items:center}
+  .share-url-input{flex:1;font:13px/1 var(--mono);color:var(--ink);background:var(--bg);
+    border:1px solid var(--line);border-radius:3px;padding:8px 10px;outline:none;cursor:text}
+  .share-copy-btn{appearance:none;border:1px solid var(--ink);background:var(--surface);
+    color:var(--ink);font:600 12px/1 var(--font);padding:8px 12px;cursor:pointer;
+    border-radius:3px;white-space:nowrap;transition:background 120ms var(--ease),color 120ms var(--ease)}
+  .share-copy-btn:hover{background:var(--ink);color:var(--raised)}
+  .share-copy-btn.copied{background:#5a9e6f;border-color:#5a9e6f;color:#fff}
+  .share-loading-row{font-size:14px;color:var(--ink2);margin:12px 0 24px;display:flex;align-items:center;gap:10px}
+  .share-spinner{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:share-spin 600ms linear infinite;flex-shrink:0}
+  @keyframes share-spin{to{transform:rotate(360deg)}}
+  .share-error-msg{font-size:13px;color:var(--ink2);margin:8px 0 18px;line-height:1.5}
+  .share-note{font-size:11px;color:var(--mute);font-family:var(--mono);margin-top:10px;line-height:1.6}
+
   /* ── Palette picker ─────────────────────────────────────────── */
   .pal-btn-dots{display:flex;gap:3px;align-items:center;height:1em}
   .pal-btn-dot{width:8px;height:8px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.12)}
@@ -363,6 +382,23 @@
 
   /* ── Export picker ──────────────────────────────────────────── */
   .export-picker{position:relative;display:flex;align-items:center}
+  /* ── View / layout picker ───────────────────────────────────── */
+  .view-picker{position:relative;display:flex;align-items:center}
+  .view-popup{position:absolute;top:calc(100% + 8px);right:0;
+    background:var(--surface);border:1px solid var(--ink2);border-radius:6px;
+    padding:6px;display:flex;flex-direction:column;gap:2px;min-width:140px;
+    z-index:200;opacity:0;pointer-events:none;transform:translateY(-4px);
+    transition:opacity 140ms var(--ease),transform 140ms var(--ease);box-shadow:0 4px 16px rgba(0,0,0,.12)}
+  .view-popup.show{opacity:1;pointer-events:auto;transform:none}
+  .view-opt{appearance:none;border:0;background:transparent;width:100%;
+    font:500 13px/1 var(--font);color:var(--ink);padding:8px 10px;border-radius:4px;
+    cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;
+    transition:background 100ms var(--ease)}
+  .view-opt:hover{background:var(--bg)}
+  .view-opt.current{background:var(--bg);font-weight:600}
+  .view-opt .v-icon{font-size:14px;width:16px;text-align:center;flex-shrink:0;opacity:.7}
+  .view-opt .v-check{margin-left:auto;font-size:11px;opacity:.5}
+
   .export-popup{position:absolute;top:calc(100% + 8px);right:0;
     background:var(--surface);border:1px solid var(--ink2);border-radius:6px;
     padding:6px;display:flex;flex-direction:column;gap:2px;min-width:130px;
@@ -498,6 +534,14 @@
     <span class="toggle-track"><span class="toggle-thumb"></span></span>
     <span class="toggle-label" id="timer-label">Timer</span>
   </label>
+  <div class="view-picker" id="view-picker">
+    <button class="btn" id="view-btn" title="Layout style"><span id="view-btn-label">Timeline</span> <span class="arrow">▾</span></button>
+    <div class="view-popup" id="view-popup">
+      <button class="view-opt current" data-view="timeline"><span class="v-icon">↔</span>Timeline<span class="v-check">✓</span></button>
+      <button class="view-opt" data-view="map"><span class="v-icon">◎</span>Map</button>
+      <button class="view-opt" data-view="logic"><span class="v-icon">↕</span>Logic</button>
+    </div>
+  </div>
   <div class="palette-picker" id="palette-picker">
     <button class="btn" id="palette-btn" title="Color theme">
       <span class="pal-btn-dots" id="pal-btn-dots">
@@ -510,6 +554,7 @@
   </div>
   <button class="btn" id="remote-btn" title="Phone remote">Clicker</button>
   <button class="btn" id="record-btn" title="Record presentation">&#9679; Record</button>
+  <button class="btn" id="share-btn" title="Share slides">Share</button>
   <button class="btn primary" id="present-btn">&#9654; Present <kbd>F</kbd></button>
   <div class="export-picker" id="export-picker">
     <button class="btn" id="export-btn">Export &#9662;</button>
@@ -629,6 +674,42 @@
     <ul class="help-features" id="help-features"></ul>
     <div class="help-credit">created by Denys Skvortsov</div>
     <div class="close"><button class="btn" id="help-close">Got it</button></div>
+  </div>
+</div>
+
+<div class="help" id="share-modal">
+  <div class="help-card share-card">
+    <div id="share-step-info">
+      <h3>Share slides</h3>
+      <p>Everything is encoded directly into the link — no server, no account needed. Images are compressed to fit.</p>
+      <div class="share-btns">
+        <button class="btn" id="share-cancel">Cancel</button>
+        <button class="btn primary" id="share-confirm">Create link</button>
+      </div>
+    </div>
+    <div id="share-step-loading" style="display:none">
+      <h3>Creating link…</h3>
+      <div class="share-loading-row"><span class="share-spinner"></span>Compressing slides</div>
+    </div>
+    <div id="share-step-done" style="display:none">
+      <h3>Link ready</h3>
+      <p>Anyone with this link can view your slides.</p>
+      <div class="share-url-row">
+        <input type="text" class="share-url-input" id="share-url-input" readonly>
+        <button class="share-copy-btn" id="share-copy-btn">Copy</button>
+      </div>
+      <div class="share-btns">
+        <button class="btn" id="share-done-close">Close</button>
+      </div>
+      <p class="share-note">self-contained · no server · images compressed to 420px</p>
+    </div>
+    <div id="share-step-error" style="display:none">
+      <h3>Failed to create link</h3>
+      <p class="share-error-msg" id="share-error-msg">Something went wrong.</p>
+      <div class="share-btns">
+        <button class="btn" id="share-error-close">Close</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1047,10 +1128,23 @@ function computeCardSize(){
   r.style.setProperty('--node-pad-h',  cl(CARD_W * 0.081,   8, 32) + 'px');
 }
 
-// ── Hybrid layout ────────────────────────────────────────────
-// H1 anchored left. H2 children spread horizontally to the right
-// on the same row (timeline). H3+ stacks below its parent H2.
-function layout(root){
+// ── Layouts ───────────────────────────────────────────────────
+function applyBounds(root){
+  const all = flatten(root);
+  let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  for (const n of all){
+    minX=Math.min(minX,n.x); minY=Math.min(minY,n.y);
+    maxX=Math.max(maxX,n.x+n.w); maxY=Math.max(maxY,n.y+n.h);
+  }
+  if (!all.length){ minX=minY=0; maxX=maxY=100; }
+  root.bounds = { minX, minY, maxX, maxY,
+    w:(maxX-minX)+PAD*2, h:(maxY-minY)+PAD*2,
+    offX:-minX+PAD, offY:-minY+PAD };
+  for (const n of all){ n.x += root.bounds.offX; n.y += root.bounds.offY; }
+}
+
+// Timeline: H1 left, H2s horizontal, H3s stacked below
+function layoutTimeline(root){
   function measure(n){
     n.w = CARD_W;
     n.h = CARD_H;
@@ -1089,18 +1183,108 @@ function layout(root){
     yOffset = sectionBottom + V_GAP * 1.5;
   }
 
-  // compute bounds and apply offset so all coords are positive
-  let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  applyBounds(root);
+}
+
+// Map: radial mind-map, H1s in a ring, H2s/H3s fan outward
+function layoutMap(root){
   const all = flatten(root);
-  for (const n of all){
-    minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
-    maxX = Math.max(maxX, n.x + n.w); maxY = Math.max(maxY, n.y + n.h);
+  if (!all.length){ root.bounds={minX:0,minY:0,maxX:100,maxY:100,w:200,h:200,offX:0,offY:0}; return; }
+  for (const n of all){ n.w=CARD_W; n.h=CARD_H; }
+
+  const HDIST = CARD_W * 0.9; // horizontal gap between levels
+
+  // Place a column of nodes on one side, each level extending further out.
+  // centerY: the y-midpoint to center the column around.
+  function placeCol(nodes, side, x, centerY, depth){
+    if (!nodes.length) return;
+    const totalH = nodes.length * CARD_H + (nodes.length - 1) * V_GAP;
+    const startY  = centerY - totalH / 2;
+    nodes.forEach((n, i) => {
+      n.x = x; n.y = startY + i * (CARD_H + V_GAP); n.depth = depth;
+      if (n.children.length){
+        const nx = side === 'right' ? n.x + CARD_W + HDIST : n.x - HDIST - CARD_W;
+        placeCol(n.children, side, nx, n.y + CARD_H/2, depth + 1);
+      }
+    });
   }
-  if (!all.length){ minX=minY=0; maxX=maxY=100; }
-  root.bounds = { minX, minY, maxX, maxY,
-    w: (maxX-minX)+PAD*2, h:(maxY-minY)+PAD*2,
-    offX: -minX+PAD, offY: -minY+PAD };
-  for (const n of all){ n.x += root.bounds.offX; n.y += root.bounds.offY; }
+
+  const h1s = root.children;
+
+  if (h1s.length === 1){
+    // Single centre node: split H2s left / right
+    const h1 = h1s[0];
+    h1.x = -CARD_W/2; h1.y = -CARD_H/2; h1.depth = 0;
+
+    const h2s = h1.children;
+    const rCount = Math.ceil(h2s.length / 2);
+    const rightNodes = h2s.slice(0, rCount);
+    const leftNodes  = h2s.slice(rCount);
+
+    placeCol(rightNodes, 'right', CARD_W/2 + HDIST,          0, 1);
+    placeCol(leftNodes,  'left',  -CARD_W/2 - HDIST - CARD_W, 0, 1);
+
+  } else {
+    // Multiple H1s: each acts as its own centre, stacked vertically,
+    // with its H2s split left / right.
+    let yOff = 0;
+    h1s.forEach(h1 => {
+      h1.x = -CARD_W/2; h1.y = yOff - CARD_H/2; h1.depth = 0;
+      const cy = yOff;
+
+      const h2s = h1.children;
+      const rCount = Math.ceil(h2s.length / 2);
+      placeCol(h2s.slice(0, rCount), 'right', CARD_W/2 + HDIST,          cy, 1);
+      placeCol(h2s.slice(rCount),    'left',  -CARD_W/2 - HDIST - CARD_W, cy, 1);
+
+      // Advance yOff: enough room for the tallest side
+      const sideH = side => {
+        const ns = side === 'right' ? h2s.slice(0, rCount) : h2s.slice(rCount);
+        return ns.length ? ns.length * CARD_H + (ns.length - 1) * V_GAP : CARD_H;
+      };
+      yOff += Math.max(CARD_H, sideH('right'), sideH('left')) + V_GAP * 3;
+    });
+  }
+
+  applyBounds(root);
+}
+
+// Logic: top-down tree, parents centred over children
+function layoutLogic(root){
+  const all = flatten(root);
+  if (!all.length){ root.bounds={minX:0,minY:0,maxX:100,maxY:100,w:200,h:200,offX:0,offY:0}; return; }
+  for (const n of all){ n.w=CARD_W; n.h=CARD_H; }
+
+  const HDIST = CARD_W * 0.9;
+
+  function subH(n){
+    if (!n.children.length) return CARD_H;
+    const total = n.children.reduce((s,c) => s+subH(c), 0) + V_GAP*(n.children.length-1);
+    return Math.max(CARD_H, total);
+  }
+
+  function place(n, x, centerY, depth){
+    n.depth = depth;
+    n.x = x;
+    n.y = centerY - CARD_H/2;
+    if (!n.children.length) return;
+    const totalH = n.children.reduce((s,c) => s+subH(c), 0) + V_GAP*(n.children.length-1);
+    let cy = centerY - totalH/2;
+    for (const c of n.children){
+      const sh = subH(c);
+      place(c, x + CARD_W + HDIST, cy + sh/2, depth+1);
+      cy += sh + V_GAP;
+    }
+  }
+
+  let yOff = 0;
+  for (const h1 of root.children){
+    const sh = subH(h1);
+    place(h1, 0, yOff + sh/2, 0);
+    yOff += sh + V_GAP*2;
+  }
+
+  applyBounds(root);
 }
 
 // ── State ────────────────────────────────────────────────────
@@ -1114,6 +1298,7 @@ const state = {
   cam: { x:0, y:0, scale:1 },
   baseCam: { x:0, y:0, scale:1 },
   footer: '',
+  viewMode: 'timeline',
 };
 
 function totalRevealSteps(n){
@@ -1137,15 +1322,30 @@ function renderNodes(){
   // connectors
   connSvg.innerHTML = '';
   function drawConn(parent, child){
-    const sameRow = Math.abs(parent.y - child.y) < 4;
     let d;
-    if (sameRow){
-      const y = parent.y + parent.h/2;
-      d = `M ${parent.x + parent.w} ${y} H ${child.x}`;
+    if (state.viewMode === 'map'){
+      const py = parent.y + parent.h/2;
+      const cy = child.y  + child.h/2;
+      const childRight = child.x + child.w/2 > parent.x + parent.w/2;
+      const px = childRight ? parent.x + parent.w : parent.x;
+      const cx = childRight ? child.x             : child.x + child.w;
+      const mx = (px + cx) / 2;
+      d = `M ${px} ${py} C ${mx} ${py} ${mx} ${cy} ${cx} ${cy}`;
+    } else if (state.viewMode === 'logic'){
+      const py = parent.y + parent.h/2, px = parent.x + parent.w;
+      const cy = child.y  + child.h/2,  cx = child.x;
+      const mx = (px + cx) / 2;
+      d = `M ${px} ${py} C ${mx} ${py} ${mx} ${cy} ${cx} ${cy}`;
     } else {
-      const guideX = parent.x + 20;
-      const cy = child.y + child.h/2;
-      d = `M ${guideX} ${parent.y + parent.h} V ${cy} H ${child.x}`;
+      const sameRow = Math.abs(parent.y - child.y) < 4;
+      if (sameRow){
+        const y = parent.y + parent.h/2;
+        d = `M ${parent.x+parent.w} ${y} H ${child.x}`;
+      } else {
+        const guideX = parent.x + 20;
+        const cy = child.y + child.h/2;
+        d = `M ${guideX} ${parent.y+parent.h} V ${cy} H ${child.x}`;
+      }
     }
     const p = document.createElementNS('http://www.w3.org/2000/svg','path');
     p.setAttribute('d', d);
@@ -1417,7 +1617,9 @@ function doRebuild(){
   const root = parseMarkdown(content);
   state.root = root;
   state.nodes = flatten(root);
-  layout(root);
+  if (state.viewMode === 'map') layoutMap(root);
+  else if (state.viewMode === 'logic') layoutLogic(root);
+  else layoutTimeline(root);
   if (state.activeIdx >= state.nodes.length) state.activeIdx = Math.max(0, state.nodes.length-1);
   renderNodes();
   if (state.nodes.length){
@@ -2154,6 +2356,137 @@ recordBtn.addEventListener('click', () => {
   recordModal.classList.add('show');
 });
 
+// ── Share (URL-encoded) ───────────────────────────────────────
+const shareModal      = $('#share-modal');
+const shareStepInfo    = $('#share-step-info');
+const shareStepLoading = $('#share-step-loading');
+const shareStepDone    = $('#share-step-done');
+const shareStepError   = $('#share-step-error');
+
+function showShareStep(step){
+  shareStepInfo.style.display    = step==='info'    ? '' : 'none';
+  shareStepLoading.style.display = step==='loading' ? '' : 'none';
+  shareStepDone.style.display    = step==='done'    ? '' : 'none';
+  shareStepError.style.display   = step==='error'   ? '' : 'none';
+}
+function openShareModal(){ showShareStep('info'); shareModal.classList.add('show'); }
+function closeShareModal(){ shareModal.classList.remove('show'); }
+
+$('#share-btn').addEventListener('click', openShareModal);
+$('#share-cancel').addEventListener('click', closeShareModal);
+$('#share-done-close').addEventListener('click', closeShareModal);
+$('#share-error-close').addEventListener('click', closeShareModal);
+shareModal.addEventListener('click', e => { if (e.target===shareModal) closeShareModal(); });
+
+$('#share-confirm').addEventListener('click', async () => {
+  showShareStep('loading');
+  try {
+    const url = await createUrlShare();
+    $('#share-url-input').value = url;
+    showShareStep('done');
+  } catch(e) {
+    $('#share-error-msg').textContent = e.message || 'Failed to create link.';
+    showShareStep('error');
+  }
+});
+
+$('#share-copy-btn').addEventListener('click', () => {
+  const val = $('#share-url-input').value;
+  navigator.clipboard.writeText(val).catch(() => { const i=$('#share-url-input'); i.select(); document.execCommand('copy'); });
+  const btn = $('#share-copy-btn');
+  btn.textContent = 'Copied!'; btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+});
+
+function compressImage(dataUrl, maxWidth, quality){
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+async function deflate(str){
+  const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+  const buf = await new Response(stream).arrayBuffer();
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+
+async function inflate(b64){
+  const bin = atob(b64.replace(/-/g,'+').replace(/_/g,'/'));
+  const buf = Uint8Array.from(bin, c => c.charCodeAt(0));
+  const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Response(stream).text();
+}
+
+async function createUrlShare(){
+  const markdown = editor.value;
+  const imgs = {};
+  for (const [id, dataUrl] of imgStore.entries()){
+    if (markdown.includes('img:' + id))
+      imgs[id] = await compressImage(dataUrl, 420, 0.72);
+  }
+  const encoded = await deflate(JSON.stringify({ md: markdown, imgs }));
+  return `${location.origin}${location.pathname}#v1:${encoded}`;
+}
+
+async function decodeUrlShare(encoded){
+  const { md, imgs } = JSON.parse(await inflate(encoded));
+  for (const [id, dataUrl] of Object.entries(imgs || {})) imgStore.set(id, dataUrl);
+  return md;
+}
+
+// ── View / layout picker ──────────────────────────────────────
+const VIEW_LABELS = { timeline:'Timeline', map:'Map', logic:'Logic' };
+
+function openViewPopup(){
+  const popup = $('#view-popup');
+  popup.querySelectorAll('.view-opt').forEach(btn => {
+    const active = btn.dataset.view === state.viewMode;
+    btn.classList.toggle('current', active);
+    let check = btn.querySelector('.v-check');
+    if (active && !check){ check = document.createElement('span'); check.className='v-check'; check.textContent='✓'; btn.appendChild(check); }
+    else if (!active && check) check.remove();
+  });
+  popup.classList.add('show');
+}
+function closeViewPopup(){ $('#view-popup').classList.remove('show'); }
+
+$('#view-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  $('#view-popup').classList.contains('show') ? closeViewPopup() : openViewPopup();
+});
+document.addEventListener('click', closeViewPopup);
+$('#view-popup').addEventListener('click', e => e.stopPropagation());
+
+$('#view-popup').querySelectorAll('.view-opt').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.viewMode = btn.dataset.view;
+    $('#view-btn-label').textContent = VIEW_LABELS[state.viewMode];
+    localStorage.setItem('demka.viewMode', state.viewMode);
+    closeViewPopup();
+    doRebuild();
+    focusOnActive({ distance:0 });
+  });
+});
+
+(function initViewMode(){
+  const saved = localStorage.getItem('demka.viewMode');
+  if (saved && VIEW_LABELS[saved]){
+    state.viewMode = saved;
+    $('#view-btn-label').textContent = VIEW_LABELS[saved];
+  }
+})();
+
 // ── Language switcher ─────────────────────────────────────────
 (function initLang(){ applyLang(); })();
 $$('.lang-opt').forEach(btn => {
@@ -2171,13 +2504,21 @@ $$('.lang-opt').forEach(btn => {
 });
 
 // ── Init ─────────────────────────────────────────────────────
-editor.value = load();
-doRebuild();
-state.activeIdx = 0;
-state.bulletsShown = 0;
-updateActive();
-focusOnActive({ distance:0 });
-updateMinimap();
+(async function init(){
+  const m = location.hash.match(/^#v1:(.+)$/);
+  if (m){
+    try { editor.value = await decodeUrlShare(m[1]); }
+    catch(e){ editor.value = load(); }
+  } else {
+    editor.value = load();
+  }
+  doRebuild();
+  state.activeIdx = 0;
+  state.bulletsShown = 0;
+  updateActive();
+  focusOnActive({ distance:0 });
+  updateMinimap();
+})();
 </script>
 </body>
 </html>
