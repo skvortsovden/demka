@@ -78,7 +78,10 @@
   .stage{flex:1;display:flex;min-height:0;position:relative}
 
   .editor-pane{width:38%;min-width:280px;max-width:560px;background:var(--surface);
-    border-right:1px solid var(--line);display:flex;flex-direction:column;position:relative}
+    border-right:1px solid var(--line);display:flex;flex-direction:column;position:relative;
+    transition:width 220ms var(--ease),min-width 220ms var(--ease)}
+  body.editor-hidden .editor-pane{width:0;min-width:0;overflow:hidden;border-right:none}
+  body.editor-hidden .splitter{display:none}
   .editor-pane .ed-head{flex:0 0 auto;padding:14px 22px 8px;display:flex;align-items:center;justify-content:space-between;color:var(--mute);font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
   .editor-pane .ed-head .save-state{display:flex;align-items:center;gap:6px}
   .editor-pane .ed-head .save-state .pulse{width:6px;height:6px;background:var(--mute);border-radius:50%;display:inline-block;transition:background 240ms var(--ease)}
@@ -89,6 +92,18 @@
   .editor-pane textarea::placeholder{color:var(--mute);font-style:italic;font-family:var(--font)}
   .editor-pane textarea::-webkit-scrollbar{width:10px}
   .editor-pane textarea::-webkit-scrollbar-thumb{background:var(--line);border:3px solid var(--surface);border-radius:5px}
+
+  .ed-hide-btn,.ed-show-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:10;
+    appearance:none;border:0;border-right:1px solid var(--line);background:var(--surface);
+    color:var(--mute);cursor:pointer;padding:14px 5px;font-size:13px;line-height:1;
+    border-radius:0 4px 4px 0;transition:color 120ms var(--ease),background 120ms var(--ease)}
+  .ed-hide-btn:hover,.ed-show-tab:hover{color:var(--ink);background:var(--raised)}
+  .ed-hide-btn{display:block}
+  body.editor-hidden .ed-hide-btn{display:none}
+  body.present .ed-hide-btn{display:none}
+  .ed-show-tab{display:none}
+  body.editor-hidden .ed-show-tab{display:block}
+  body.present .ed-show-tab{display:none}
 
   .splitter{width:1px;background:var(--line);position:relative;cursor:col-resize;flex:0 0 auto}
   .splitter::before{content:"";position:absolute;inset:0 -3px;cursor:col-resize}
@@ -213,6 +228,13 @@
   .minimap .mm-dot.visited{fill:var(--visited)}
   .minimap .mm-line{stroke:var(--line);stroke-width:1;fill:none}
   .minimap.hidden{opacity:0;pointer-events:none}
+  .overview-btn{position:absolute;left:16px;bottom:16px;appearance:none;
+    border:1px solid var(--line);background:var(--surface);color:var(--mute);
+    width:28px;height:28px;border-radius:4px;cursor:pointer;display:flex;
+    align-items:center;justify-content:center;z-index:5;
+    transition:opacity 120ms var(--ease),color 120ms var(--ease),border-color 120ms var(--ease)}
+  .overview-btn:hover{color:var(--ink);border-color:var(--ink2)}
+  body.present .overview-btn{display:none}
 
   /* Empty state */
   .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
@@ -586,6 +608,8 @@
   <div class="splitter" id="splitter"></div>
 
   <section class="canvas-pane" id="canvas-pane">
+    <button class="ed-hide-btn" id="ed-hide-btn" title="Hide editor">‹</button>
+    <button class="ed-show-tab" id="ed-show-tab" title="Show editor">›</button>
     <div class="canvas-hud" id="hud">
       <div class="crumb" id="crumb"></div>
     </div>
@@ -603,6 +627,13 @@
     <div class="minimap" id="minimap">
       <svg class="mm-canvas" id="mm-svg" viewBox="0 0 180 80" preserveAspectRatio="xMidYMid meet"></svg>
     </div>
+
+    <button class="overview-btn" id="overview-btn" title="Overview — fit all (0)">
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+        <rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/>
+        <rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/>
+      </svg>
+    </button>
 
     <div class="counter" id="counter" style="display:none">
       <span id="counter-cur">1</span><span class="of">/</span><span id="counter-tot">1</span>
@@ -868,6 +899,7 @@ const STRINGS = {
       ['↑ · ↓', 'Up / down in tree'],
       ['Home', 'Jump to root'],
       ['End', 'Jump to last node'],
+      ['0', 'Overview — fit all nodes on screen'],
       ['?', 'Show this'],
     ],
   },
@@ -1309,52 +1341,74 @@ function totalRevealSteps(n){
 }
 
 // ── Render ───────────────────────────────────────────────────
+function drawConn(parent, child){
+  let d;
+  if (state.viewMode === 'map'){
+    const py = parent.y + parent.h/2;
+    const cy = child.y  + child.h/2;
+    const childRight = child.x + child.w/2 > parent.x + parent.w/2;
+    const px = childRight ? parent.x + parent.w : parent.x;
+    const cx = childRight ? child.x             : child.x + child.w;
+    const mx = (px + cx) / 2;
+    d = `M ${px} ${py} C ${mx} ${py} ${mx} ${cy} ${cx} ${cy}`;
+  } else if (state.viewMode === 'logic'){
+    const py = parent.y + parent.h/2, px = parent.x + parent.w;
+    const cy = child.y  + child.h/2,  cx = child.x;
+    const mx = (px + cx) / 2;
+    d = `M ${px} ${py} C ${mx} ${py} ${mx} ${cy} ${cx} ${cy}`;
+  } else {
+    const sameRow = Math.abs(parent.y - child.y) < 4;
+    if (sameRow){
+      const y = parent.y + parent.h/2;
+      d = `M ${parent.x+parent.w} ${y} H ${child.x}`;
+    } else {
+      const guideX = parent.x + 20;
+      const cy = child.y + child.h/2;
+      d = `M ${guideX} ${parent.y+parent.h} V ${cy} H ${child.x}`;
+    }
+  }
+  const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+  p.setAttribute('d', d);
+  p.dataset.parent = parent.id;
+  p.dataset.child  = child.id;
+  connSvg.appendChild(p);
+}
+function walkConn(n){ for (const c of n.children){ drawConn(n, c); walkConn(c); } }
+
+function redrawConnectors(bounds){
+  connSvg.setAttribute('width', bounds.w);
+  connSvg.setAttribute('height', bounds.h);
+  connSvg.setAttribute('viewBox', `0 0 ${bounds.w} ${bounds.h}`);
+  connSvg.innerHTML = '';
+  for (const top of state.root.children) walkConn(top);
+}
+
+function refreshLayout(){
+  if (!state.root || !state.nodes.length) return;
+  computeCardSize();
+  if (state.viewMode === 'map') layoutMap(state.root);
+  else if (state.viewMode === 'logic') layoutLogic(state.root);
+  else layoutTimeline(state.root);
+  const b = state.root.bounds;
+  world.style.width  = b.w + 'px';
+  world.style.height = b.h + 'px';
+  redrawConnectors(b);
+  for (const n of state.nodes) if (n.el){
+    n.el.style.left   = n.x + 'px';
+    n.el.style.top    = n.y + 'px';
+    n.el.style.width  = CARD_W + 'px';
+    n.el.style.height = CARD_H + 'px';
+  }
+  focusOnActive({ distance: 0 });
+}
+
 function renderNodes(){
   $$('#world > .node').forEach(el => el.remove());
 
   const bounds = state.root.bounds;
   world.style.width  = bounds.w + 'px';
   world.style.height = bounds.h + 'px';
-  connSvg.setAttribute('width', bounds.w);
-  connSvg.setAttribute('height', bounds.h);
-  connSvg.setAttribute('viewBox', `0 0 ${bounds.w} ${bounds.h}`);
-
-  // connectors
-  connSvg.innerHTML = '';
-  function drawConn(parent, child){
-    let d;
-    if (state.viewMode === 'map'){
-      const py = parent.y + parent.h/2;
-      const cy = child.y  + child.h/2;
-      const childRight = child.x + child.w/2 > parent.x + parent.w/2;
-      const px = childRight ? parent.x + parent.w : parent.x;
-      const cx = childRight ? child.x             : child.x + child.w;
-      const mx = (px + cx) / 2;
-      d = `M ${px} ${py} C ${mx} ${py} ${mx} ${cy} ${cx} ${cy}`;
-    } else if (state.viewMode === 'logic'){
-      const py = parent.y + parent.h/2, px = parent.x + parent.w;
-      const cy = child.y  + child.h/2,  cx = child.x;
-      const mx = (px + cx) / 2;
-      d = `M ${px} ${py} C ${mx} ${py} ${mx} ${cy} ${cx} ${cy}`;
-    } else {
-      const sameRow = Math.abs(parent.y - child.y) < 4;
-      if (sameRow){
-        const y = parent.y + parent.h/2;
-        d = `M ${parent.x+parent.w} ${y} H ${child.x}`;
-      } else {
-        const guideX = parent.x + 20;
-        const cy = child.y + child.h/2;
-        d = `M ${guideX} ${parent.y+parent.h} V ${cy} H ${child.x}`;
-      }
-    }
-    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-    p.setAttribute('d', d);
-    p.dataset.parent = parent.id;
-    p.dataset.child  = child.id;
-    connSvg.appendChild(p);
-  }
-  function walkConn(n){ for (const c of n.children){ drawConn(n, c); walkConn(c); } }
-  for (const top of state.root.children) walkConn(top);
+  redrawConnectors(bounds);
 
   // nodes
   for (const n of state.nodes){
@@ -1529,6 +1583,15 @@ function resetCamera(){
   if (!b){ applyCam(0,0,1,0); return; }
   const scale = Math.min(rect.width / b.w, rect.height / b.h, 1);
   applyCam((rect.width - b.w*scale)/2, (rect.height - b.h*scale)/2, scale, 0);
+}
+
+function zoomFitAll(){
+  const rect = canvas.getBoundingClientRect();
+  const b = state.root?.bounds;
+  if (!b || !state.nodes.length) return;
+  const pad = 32;
+  const scale = Math.min((rect.width - pad*2) / b.w, (rect.height - pad*2) / b.h);
+  applyCam((rect.width - b.w*scale)/2, (rect.height - b.h*scale)/2, scale, 1);
 }
 
 // ── Navigation ───────────────────────────────────────────────
@@ -1773,8 +1836,11 @@ document.addEventListener('keydown', e => {
     case 'Home': goTo(0); e.preventDefault(); break;
     case 'End':  goTo(state.nodes.length-1, {reveal:'all'}); e.preventDefault(); break;
     case '?': showHelp(); e.preventDefault(); break;
+    case '0': zoomFitAll(); e.preventDefault(); break;
   }
 });
+
+$('#overview-btn').addEventListener('click', zoomFitAll);
 
 function showHelp(){ helpEl.classList.add('show'); }
 function hideHelp(){ helpEl.classList.remove('show'); }
@@ -2444,6 +2510,27 @@ async function decodeUrlShare(encoded){
   for (const [id, dataUrl] of Object.entries(imgs || {})) imgStore.set(id, dataUrl);
   return md;
 }
+
+// ── Editor hide/show ─────────────────────────────────────────
+function toggleEditor(){
+  const hidden = document.body.classList.toggle('editor-hidden');
+  localStorage.setItem('demka.editorHidden', hidden ? '1' : '');
+  const DURATION = 260; // slightly past the 220ms CSS transition
+  const start = performance.now();
+  world.style.transition = 'none'; // suppress camera CSS transition during rAF loop
+  function tick(now){
+    refreshLayout();
+    if (now - start < DURATION){
+      requestAnimationFrame(tick);
+    } else {
+      world.style.transition = '';
+    }
+  }
+  requestAnimationFrame(tick);
+}
+$('#ed-hide-btn').addEventListener('click', toggleEditor);
+$('#ed-show-tab').addEventListener('click', toggleEditor);
+if (localStorage.getItem('demka.editorHidden')) document.body.classList.add('editor-hidden');
 
 // ── View / layout picker ──────────────────────────────────────
 const VIEW_LABELS = { timeline:'Timeline', map:'Map', logic:'Logic' };
