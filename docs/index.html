@@ -1836,6 +1836,7 @@ document.addEventListener('keydown', e => {
   }
   switch(e.key){
     case 'f': case 'F': togglePresent(); e.preventDefault(); break;
+    case 'e': case 'E': if (!state.present){ toggleEditor(); e.preventDefault(); } break;
     case 'Escape': if (state.present){ togglePresent(); e.preventDefault(); } break;
     case ' ': case 'ArrowRight': advance(); e.preventDefault(); break;
     case 'ArrowLeft': back(); e.preventDefault(); break;
