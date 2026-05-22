@@ -1232,16 +1232,17 @@ function layoutMap(root){
   if (!all.length){ root.bounds={minX:0,minY:0,maxX:100,maxY:100,w:200,h:200,offX:0,offY:0}; return; }
   for (const n of all){ n.w=CARD_W; n.h=CARD_H; }
 
-  const HDIST = CARD_W * 0.9; // horizontal gap between levels
+  const HDIST  = CARD_W * 0.4;  // horizontal gap between levels (short connectors)
+  const MVGAP  = V_GAP  * 0.5;  // tighter vertical gap between sibling cards
 
   // Place a column of nodes on one side, each level extending further out.
   // centerY: the y-midpoint to center the column around.
   function placeCol(nodes, side, x, centerY, depth){
     if (!nodes.length) return;
-    const totalH = nodes.length * CARD_H + (nodes.length - 1) * V_GAP;
+    const totalH = nodes.length * CARD_H + (nodes.length - 1) * MVGAP;
     const startY  = centerY - totalH / 2;
     nodes.forEach((n, i) => {
-      n.x = x; n.y = startY + i * (CARD_H + V_GAP); n.depth = depth;
+      n.x = x; n.y = startY + i * (CARD_H + MVGAP); n.depth = depth;
       if (n.children.length){
         const nx = side === 'right' ? n.x + CARD_W + HDIST : n.x - HDIST - CARD_W;
         placeCol(n.children, side, nx, n.y + CARD_H/2, depth + 1);
@@ -1280,9 +1281,9 @@ function layoutMap(root){
       // Advance yOff: enough room for the tallest side
       const sideH = side => {
         const ns = side === 'right' ? h2s.slice(0, rCount) : h2s.slice(rCount);
-        return ns.length ? ns.length * CARD_H + (ns.length - 1) * V_GAP : CARD_H;
+        return ns.length ? ns.length * CARD_H + (ns.length - 1) * MVGAP : CARD_H;
       };
-      yOff += Math.max(CARD_H, sideH('right'), sideH('left')) + V_GAP * 3;
+      yOff += Math.max(CARD_H, sideH('right'), sideH('left')) + MVGAP * 3;
     });
   }
 
