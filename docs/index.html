@@ -2454,9 +2454,11 @@ const FIREBASE_CONFIG = {
 };
 
 let _firebase = null;
+let currentShareId = null;
+
 async function getFirebase(){
   if (_firebase) return _firebase;
-  const [{ initializeApp }, { getFirestore, doc, addDoc, getDoc, collection, serverTimestamp }, { initializeAppCheck, ReCaptchaV3Provider }] = await Promise.all([
+  const [{ initializeApp }, { getFirestore, doc, addDoc, setDoc, getDoc, collection, serverTimestamp }, { initializeAppCheck, ReCaptchaV3Provider }] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js'),
     import('https://www.gstatic.com/firebasejs/12.13.0/firebase-app-check.js'),
@@ -2467,7 +2469,7 @@ async function getFirebase(){
     isTokenAutoRefreshEnabled: true,
   });
   const db = getFirestore(app);
-  _firebase = { db, doc, addDoc, getDoc, collection, serverTimestamp };
+  _firebase = { db, doc, addDoc, setDoc, getDoc, collection, serverTimestamp };
   return _firebase;
 }
 
@@ -2478,10 +2480,14 @@ async function createFirestoreShare(){
     if (markdown.includes('img:' + id))
       imgs[id] = await compressImage(dataUrl, 420, 0.72);
   }
-  const { db, addDoc, collection, serverTimestamp } = await getFirebase();
-  const ref = await addDoc(collection(db, 'shares'), {
-    md: markdown, imgs, created: serverTimestamp(),
-  });
+  const { db, doc, addDoc, setDoc, collection, serverTimestamp } = await getFirebase();
+  const data = { md: markdown, imgs, created: serverTimestamp() };
+  if (currentShareId){
+    await setDoc(doc(db, 'shares', currentShareId), data);
+    return `${location.origin}${location.pathname}#share:${currentShareId}`;
+  }
+  const ref = await addDoc(collection(db, 'shares'), data);
+  currentShareId = ref.id;
   return `${location.origin}${location.pathname}#share:${ref.id}`;
 }
 
@@ -2672,7 +2678,7 @@ $$('.lang-opt').forEach(btn => {
   const mShare = location.hash.match(/^#share:(.+)$/);
   const mV1    = location.hash.match(/^#v1:(.+)$/);
   if (mShare){
-    try { editor.value = await loadFirestoreShare(mShare[1]); }
+    try { editor.value = await loadFirestoreShare(mShare[1]); currentShareId = mShare[1]; }
     catch(e){ editor.value = load(); }
   } else if (mV1){
     try { editor.value = await decodeUrlShare(mV1[1]); }
