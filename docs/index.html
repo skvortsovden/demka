@@ -747,6 +747,7 @@
         <li>stored in firebase</li>
         <li>no account needed to view</li>
         <li>images compressed to 420px</li>
+        <li>expires at: <span id="share-expires"></span></li>
       </ul>
       <div class="share-btns">
         <button class="btn" id="share-done-close">Close</button>
@@ -2579,6 +2580,8 @@ $('#share-confirm').addEventListener('click', async () => {
   try {
     const url = await createFirestoreShare();
     $('#share-url-input').value = url;
+    const exp = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    $('#share-expires').textContent = exp.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
     showShareStep('done');
   } catch(e) {
     $('#share-error-msg').textContent = e.message || 'Failed to create link.';
