@@ -381,6 +381,10 @@
   body.no-cards .node{background:transparent!important;border-color:transparent!important;box-shadow:none!important}
   body.no-cards .node:hover{border-color:transparent!important}
   body.no-cards .connectors{display:none}
+  body.no-cards.view-timeline .connectors{display:block}
+  .connectors path[data-type="spine"]{stroke-width:2}
+  body.no-cards.view-timeline .connectors path{stroke:var(--ink2);stroke-width:1.5}
+  body.no-cards.view-timeline .connectors path[data-type="spine"]{stroke-width:3}
   .toggle-sw{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
   .toggle-sw input{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
   .toggle-track{width:30px;height:17px;border-radius:9px;background:var(--line);
@@ -558,6 +562,11 @@
     <input type="checkbox" id="cards-check" checked>
     <span class="toggle-track"><span class="toggle-thumb"></span></span>
     <span class="toggle-label" id="cards-label">Cards</span>
+  </label>
+  <label class="toggle-sw" title="Zoom in on bullet reveal">
+    <input type="checkbox" id="zoom-check" checked>
+    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+    <span class="toggle-label">Zoom</span>
   </label>
   <label class="toggle-sw" title="Show/hide timer">
     <input type="checkbox" id="timer-check">
@@ -1191,44 +1200,36 @@ function applyBounds(root){
 
 // Timeline: H1 left, H2s horizontal, H3s stacked below
 function layoutTimeline(root){
-  function measure(n){
-    n.w = CARD_W;
-    n.h = CARD_H;
-    for (const c of n.children) measure(c);
-  }
-  for (const c of root.children) measure(c);
+  const all = flatten(root);
+  if (!all.length){ root.bounds={minX:0,minY:0,maxX:100,maxY:100,w:200,h:200,offX:0,offY:0}; return; }
+  for (const n of all){ n.w = CARD_W; n.h = CARD_H; }
 
-  function stackBelow(parent, anchorX, startY, depth){
-    let yCur = startY;
-    for (const c of parent.children){
-      c.x = anchorX; c.y = yCur; c.depth = depth;
-      yCur += c.h + V_GAP;
-      yCur = stackBelow(c, anchorX, yCur, depth + 1);
-    }
-    return yCur;
-  }
+  // H1 and H2 share the same horizontal row, headers aligned to the spine.
+  // HEADER_MID ≈ --node-pad-v + --nfs-h1/2 as a fraction of CARD_H.
+  const HEADER_MID = Math.round(CARD_H * 0.18);
+  const ROW_Y      = -HEADER_MID; // card top so heading sits exactly on y=0 (spine)
+  const CHILD_GAP  = Math.round(V_GAP * 0.55);
+  const SUB_GAP    = Math.round(V_GAP * 0.35);
 
-  let yOffset = 0;
+  let xCur = 0;
   for (const h1 of root.children){
-    let rowMaxH = h1.h;
-    for (const h2 of h1.children) rowMaxH = Math.max(rowMaxH, h2.h);
-    const rowCenter = yOffset + rowMaxH / 2;
-    const rowBottom = yOffset + rowMaxH;
-
-    h1.x = 0; h1.y = rowCenter - h1.h / 2; h1.depth = 0;
-    let xCursor = h1.w + H_GAP;
-    let sectionBottom = rowBottom;
+    h1.x = xCur; h1.y = ROW_Y; h1.depth = 0;
+    xCur += CARD_W + H_GAP;
 
     for (const h2 of h1.children){
-      h2.x = xCursor; h2.y = rowCenter - h2.h / 2; h2.depth = 1;
-      xCursor += h2.w + H_GAP;
-      const stackTop = rowBottom + V_GAP;
-      const bottom = stackBelow(h2, h2.x, stackTop, 2);
-      if (bottom > sectionBottom) sectionBottom = bottom;
+      h2.x = xCur; h2.y = ROW_Y; h2.depth = 1;
+
+      let yCur = ROW_Y + CARD_H + CHILD_GAP;
+      for (const h3 of h2.children){
+        h3.x = xCur; h3.y = yCur; h3.depth = 2;
+        yCur += CARD_H + SUB_GAP;
+      }
+      xCur += CARD_W + H_GAP;
     }
-    yOffset = sectionBottom + V_GAP * 1.5;
+    xCur += H_GAP; // extra section gap after each H1 group
   }
 
+  root._tlHeaderMid = HEADER_MID;
   applyBounds(root);
 }
 
@@ -1347,6 +1348,7 @@ const state = {
   footer: '',
   viewMode: 'timeline',
   inFitAll: false,
+  zoomEnabled: true,
 };
 
 function totalRevealSteps(n){
@@ -1391,12 +1393,48 @@ function drawConn(parent, child){
 }
 function walkConn(n){ for (const c of n.children){ drawConn(n, c); walkConn(c); } }
 
+function mkPath(d, parentId, childId, type){
+  const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+  p.setAttribute('d', d);
+  if (parentId) p.dataset.parent = parentId;
+  if (childId)  p.dataset.child  = childId;
+  if (type)     p.dataset.type   = type;
+  connSvg.appendChild(p);
+}
+
+function drawTimelineSpine(){
+  const h1s = state.root.children;
+  if (!h1s.length) return;
+
+  // Spine runs along the top edge of all on-row (H1 + H2) cards
+  const spineY = h1s[0].y;
+  let xRight = 0;
+  for (const h1 of h1s){
+    xRight = Math.max(xRight, h1.x + CARD_W);
+    for (const h2 of h1.children) xRight = Math.max(xRight, h2.x + CARD_W);
+  }
+  mkPath(`M ${h1s[0].x} ${spineY} H ${xRight}`, null, null, 'spine');
+
+  for (const h1 of h1s){
+    for (const h2 of h1.children){
+      // Gap between H1 and H2 (or H2 and H2) along the spine
+      mkPath(`M ${h1.x + CARD_W} ${spineY} H ${h2.x}`, h1.id, h2.id, 'branch');
+
+      for (const h3 of h2.children){
+        // Vertical drop from H2 bottom-centre to H3 mid
+        mkPath(`M ${h2.x + CARD_W/2} ${h2.y + CARD_H} V ${h3.y + CARD_H/2}`, h2.id, h3.id, 'branch');
+      }
+    }
+  }
+}
+
 function redrawConnectors(bounds){
   connSvg.setAttribute('width', bounds.w);
   connSvg.setAttribute('height', bounds.h);
   connSvg.setAttribute('viewBox', `0 0 ${bounds.w} ${bounds.h}`);
   connSvg.innerHTML = '';
-  for (const top of state.root.children) walkConn(top);
+  if (state.viewMode === 'timeline') drawTimelineSpine();
+  else for (const top of state.root.children) walkConn(top);
 }
 
 function refreshLayout(){
@@ -1415,7 +1453,7 @@ function refreshLayout(){
     n.el.style.width  = CARD_W + 'px';
     n.el.style.height = CARD_H + 'px';
   }
-  focusOnActive({ distance: 0 });
+  if (state.viewMode === 'timeline') fitTimeline(); else focusOnActive({ distance: 0 });
 }
 
 function renderNodes(){
@@ -1543,14 +1581,15 @@ function safeImgSrc(src){
 
 // ── Camera ───────────────────────────────────────────────────
 function focusOnActive(opts={}){
+
   const node = state.nodes[state.activeIdx];
   if (!node){ resetCamera(); return; }
   const rect = canvas.getBoundingClientRect();
   const vw = rect.width, vh = rect.height;
   const mobile = window.innerWidth <= 640;
-  const pad = mobile ? 52 : (state.present ? 80 : 100);
+  const pad = mobile ? 52 : (state.present ? 80 : 60);
   let scale = Math.min(vw / (node.w + pad*2), vh / (node.h + pad*2));
-  if (!state.present) scale = Math.min(scale, 1.05);
+  if (!state.present) scale = Math.min(scale, 1.55);
   scale = Math.max(scale, 0.5);
   const tx = vw/2 - (node.x + node.w/2) * scale;
   const ty = vh/2 - (node.y + node.h/2) * scale;
@@ -1564,10 +1603,11 @@ function clearRevealHighlight(nodeEl){
 }
 
 function zoomToReveal(highlight=true){
+  if (!state.zoomEnabled) return;
   const node = state.nodes[state.activeIdx];
   if (!node?.el) return;
   const { scale: bs } = state.baseCam;
-  const zoomScale = bs * 1.12;
+  const zoomScale = bs * 1.3;
   const canvasRect = canvas.getBoundingClientRect();
   const vw = canvasRect.width, vh = canvasRect.height;
   const focusX = node.x + node.w / 2;
@@ -1599,6 +1639,15 @@ function resetCamera(){
   const b = state.root?.bounds;
   if (!b){ applyCam(0,0,1,0); return; }
   const scale = Math.min(rect.width / b.w, rect.height / b.h, 1);
+  applyCam((rect.width - b.w*scale)/2, (rect.height - b.h*scale)/2, scale, 0);
+}
+
+function fitTimeline(){
+  const rect = canvas.getBoundingClientRect();
+  const b = state.root?.bounds;
+  if (!b || !state.nodes.length) return;
+  const pad = 32;
+  const scale = Math.min((rect.width - pad*2) / b.w, (rect.height - pad*2) / b.h);
   applyCam((rect.width - b.w*scale)/2, (rect.height - b.h*scale)/2, scale, 0);
 }
 
@@ -2367,6 +2416,17 @@ cardsCheck.addEventListener('change', () => {
   localStorage.setItem('demka.cards', cardsCheck.checked ? 'on' : 'off');
 });
 
+// ── Zoom toggle ───────────────────────────────────────────────
+const zoomCheck = $('#zoom-check');
+(function initZoomToggle(){
+  const off = localStorage.getItem('demka.zoom') === 'off';
+  if (off){ state.zoomEnabled = false; zoomCheck.checked = false; }
+})();
+zoomCheck.addEventListener('change', () => {
+  state.zoomEnabled = zoomCheck.checked;
+  localStorage.setItem('demka.zoom', zoomCheck.checked ? 'on' : 'off');
+});
+
 // ── Timer toggle ──────────────────────────────────────────────
 const timerCheck = $('#timer-check');
 (function initTimerToggle(){
@@ -2633,11 +2693,17 @@ $('#view-btn').addEventListener('click', e => {
 document.addEventListener('click', closeViewPopup);
 $('#view-popup').addEventListener('click', e => e.stopPropagation());
 
+function applyViewClass(){
+  document.body.classList.remove('view-timeline','view-map','view-logic');
+  document.body.classList.add('view-' + state.viewMode);
+}
+
 $('#view-popup').querySelectorAll('.view-opt').forEach(btn => {
   btn.addEventListener('click', () => {
     state.viewMode = btn.dataset.view;
     $('#view-btn-label').textContent = VIEW_LABELS[state.viewMode];
     localStorage.setItem('demka.viewMode', state.viewMode);
+    applyViewClass();
     closeViewPopup();
     doRebuild();
     focusOnActive({ distance:0 });
@@ -2650,6 +2716,7 @@ $('#view-popup').querySelectorAll('.view-opt').forEach(btn => {
     state.viewMode = saved;
     $('#view-btn-label').textContent = VIEW_LABELS[saved];
   }
+  applyViewClass();
 })();
 
 // ── Language switcher ─────────────────────────────────────────
