@@ -1707,8 +1707,9 @@ function back(){
 function updateMinimap(){
   if (!state.root || !state.nodes.length){ mmSvg.innerHTML = ''; return; }
   const b = state.root.bounds;
-  const s = Math.min(110 / b.w, 52 / b.h);
-  const offX = (110 - b.w*s)/2, offY = (52 - b.h*s)/2;
+  const MM_W = 110, MM_H = 52, MM_PAD = 6;
+  const s = Math.min((MM_W - MM_PAD*2) / b.w, (MM_H - MM_PAD*2) / b.h);
+  const offX = (MM_W - b.w*s)/2, offY = (MM_H - b.h*s)/2;
   let svg = '';
   function walk(p){
     for (const c of p.children){
