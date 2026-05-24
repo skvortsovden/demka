@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.10.0] - 2026-05-24
+
+### Added
+- Google Analytics (GA4) tracking via Measurement ID G-R1SJ19CDMP
+- iOS app: share link creation from deck view (Firestore REST API, native share sheet)
+- iOS app: open shared links directly in app via Universal Links and custom URL scheme (`demka://`)
+- iOS app: pull-to-refresh in editor to sync content from a loaded share
+- iOS app: share confirmation sheet before creating a link (matches web flow)
+
+### Changed
+- Responsive topbar: new 960px and 800px breakpoints prevent overflow at half-laptop widths
+- At ≤960px: toggle labels, logo subtitle, word count meta and Clicker button hidden; buttons slimmed
+- At ≤800px: Record and Help buttons hidden; Present keyboard hint hidden
+
+---
+
 ## [2.9.0] - 2026-05-23
 
 ### Added
