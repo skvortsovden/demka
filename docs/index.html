@@ -357,6 +357,17 @@
   .pal-cust-hex:hover{background:var(--bg);color:var(--ink)}
   .pal-cust-copied{color:var(--active)!important;background:var(--bg)!important}
 
+  /* ── Template confirm modal ─────────────────────────────────── */
+  .tpl-modal{position:fixed;inset:0;background:rgba(26,26,24,.45);display:flex;
+    align-items:center;justify-content:center;z-index:200;opacity:0;pointer-events:none;
+    transition:opacity 180ms var(--ease)}
+  .tpl-modal.show{opacity:1;pointer-events:auto}
+  .tpl-modal-card{background:var(--surface);border:1px solid var(--ink);padding:28px 32px;
+    border-radius:4px;max-width:320px;width:100%;margin:24px}
+  .tpl-modal-card h3{margin:0 0 10px;font-weight:700;font-size:17px}
+  .tpl-modal-card p{margin:0 0 22px;font-size:13px;color:var(--ink2);line-height:1.5}
+  .tpl-modal-actions{display:flex;gap:10px;justify-content:flex-end}
+
   /* ── Remote modal ───────────────────────────────────────────── */
   .remote-modal{position:fixed;inset:0;background:rgba(26,26,24,.45);display:flex;
     align-items:center;justify-content:center;z-index:200;opacity:0;pointer-events:none;
@@ -729,6 +740,17 @@
 </main>
 
 <div class="present-hint" id="present-hint">Press <b>Esc</b> to exit · <b>Space</b> next · <b>&#8592;/&#8594;</b> navigate</div>
+
+<div class="tpl-modal" id="tpl-modal">
+  <div class="tpl-modal-card">
+    <h3>Insert template</h3>
+    <p>⚠️ This will override your current markdown text. Make sure to save any changes before continuing.</p>
+    <div class="tpl-modal-actions">
+      <button class="btn" id="tpl-modal-cancel">Cancel</button>
+      <button class="btn primary" id="tpl-modal-confirm">Insert</button>
+    </div>
+  </div>
+</div>
 
 <div class="remote-modal" id="remote-modal">
   <div class="remote-card">
@@ -2984,6 +3006,18 @@ function openTplPopup(){
   tplPopup.classList.add('show');
 }
 
+const tplModal        = $('#tpl-modal');
+const tplModalCancel  = $('#tpl-modal-cancel');
+const tplModalConfirm = $('#tpl-modal-confirm');
+
+function openTplModal(onConfirm) {
+  tplModal.classList.add('show');
+  const cleanup = () => { tplModal.classList.remove('show'); tplModalConfirm.onclick = null; tplModalCancel.onclick = null; };
+  tplModalConfirm.onclick = () => { cleanup(); onConfirm(); };
+  tplModalCancel.onclick  = cleanup;
+}
+tplModal.addEventListener('click', e => { if (e.target === tplModal) tplModal.classList.remove('show'); });
+
 async function onTplSelect(e){
   const file = e.currentTarget.dataset.file;
   tplPopup.classList.remove('show');
@@ -2991,10 +3025,11 @@ async function onTplSelect(e){
     const res = await fetch(`assets/templates/${file}`);
     const text = await res.text();
     const hasContent = editor.value.trim().length > 0;
-    if (hasContent && !confirm('Replace current content with this template?')) return;
-    editor.value = text;
-    save();
-    doRebuild();
+    if (hasContent) {
+      openTplModal(() => { editor.value = text; save(); doRebuild(); });
+    } else {
+      editor.value = text; save(); doRebuild();
+    }
   } catch {
     alert('Failed to load template.');
   }
