@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.11.0] - 2026-05-24
+
+### Added
+- Canvas pan: drag the background to move the view (grab/grabbing cursor, pointer capture)
+- Canvas zoom: scroll wheel zooms in/out keeping the point under cursor fixed
+- Fit-all button redesigned as a 44px circle with expand-arrows icon, matching iOS style
+
+### Changed
+- All card content (bullets, lede) always visible in canvas view — reveal animation scoped to presentation mode only
+- Visited card dimming (grey background, faded border) scoped to presentation mode only
+- View mode switch (Timeline/Map/Logic) now fits all cards into view instead of zooming into the active card
+
+---
+
 ## [2.10.0] - 2026-05-24
 
 ### Added

@@ -116,7 +116,10 @@
   .splitter:hover{background:var(--ink2)}
 
   /* ── Canvas pane ─────────────────────────────────────────── */
-  .canvas-pane{flex:1;position:relative;overflow:hidden;background:var(--bg);min-width:0}
+  .canvas-pane{flex:1;position:relative;overflow:hidden;background:var(--bg);min-width:0;cursor:grab}
+  .canvas-pane.panning{cursor:grabbing}
+  .canvas-pane .node{cursor:default}
+  body.present .canvas-pane{cursor:default}
   .canvas-world{position:absolute;inset:0;transform-origin:0 0;
     transition:transform var(--t-cam) var(--ease);
     will-change:transform}
@@ -125,7 +128,7 @@
   /* Connectors layer */
   .connectors{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
   .connectors path{fill:none;stroke:var(--line);stroke-width:1.25;transition:stroke 180ms var(--ease)}
-  .connectors path.visited{stroke:var(--visited)}
+  body.present .connectors path.visited{stroke:var(--visited)}
 
   /* Nodes */
   .node{position:absolute;background:var(--surface);border:1px solid var(--line);
@@ -135,7 +138,7 @@
       box-shadow 180ms var(--ease), color 180ms var(--ease);
     cursor:pointer;color:var(--ink)}
   .node:hover{border-color:var(--active)}
-  .node.visited{background:var(--bg);border-color:var(--visited);color:var(--ink2)}
+  body.present .node.visited{background:var(--bg);border-color:var(--visited);color:var(--ink2)}
   .node.active{background:var(--raised);border:1.5px solid var(--active);padding:calc(var(--node-pad-v,22px) - 0.5px) calc(var(--node-pad-h,26px) - 0.5px);z-index:2}
 
   .node h1, .node h2, .node h3{margin:0;font-family:var(--font);letter-spacing:-.015em;color:inherit}
@@ -143,15 +146,16 @@
   .node h2{font-weight:700;font-size:var(--nfs-h2,26px);line-height:1.18}
   .node h3{font-weight:600;font-size:var(--nfs-h3,20px);line-height:1.22}
   .node .lede{margin:10px 0 0;font-size:var(--nfs-body,16px);color:var(--ink2);line-height:1.5;max-width:38ch}
-  .node.active .lede{color:var(--ink);opacity:0;transform:translateY(6px);
-    transition:opacity var(--t-bullet) ease-out, transform var(--t-bullet) ease-out}
-  .node.active .lede.shown{opacity:1;transform:translateY(0)}
+  .node.active .lede{color:var(--ink)}
   .node ul{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
   .node li{font-size:var(--nfs-body,16px);line-height:1.5;padding:2px 0;display:flex;align-items:flex-start;gap:10px;color:inherit;
     transition:opacity var(--t-bullet) ease-out, transform var(--t-bullet) ease-out}
-  /* progressive reveal scoped to the active node only — peer cards show all bullets */
-  .node.active li{opacity:0;transform:translateY(6px)}
-  .node.active li.shown{opacity:1;transform:translateY(0)}
+  /* progressive reveal in presentation mode only */
+  body.present .node.active .lede{opacity:0;transform:translateY(6px);
+    transition:opacity var(--t-bullet) ease-out, transform var(--t-bullet) ease-out}
+  body.present .node.active .lede.shown{opacity:1;transform:translateY(0)}
+  body.present .node.active li{opacity:0;transform:translateY(6px)}
+  body.present .node.active li.shown{opacity:1;transform:translateY(0)}
   .node li::before{content:"";flex-shrink:0;width:8px;height:1.5px;background:currentColor;opacity:.5;margin-top:calc(0.75em - 0.75px)}
   .node li[data-num]{align-items:baseline}
   .node li[data-num]::before{content:attr(data-num) ".";width:auto;height:auto;background:none;font-size:.85em;font-weight:600;opacity:.6;letter-spacing:-.01em;margin-top:0}
@@ -164,7 +168,7 @@
   .node .node-footer{margin-top:auto;padding-top:10px;border-top:1px solid var(--line);
     font-size:11px;color:var(--mute);font-family:var(--mono);letter-spacing:.02em;line-height:1.4;
     flex-shrink:0}
-  .node.visited .node-footer{border-top-color:var(--visited)}
+  body.present .node.visited .node-footer{border-top-color:var(--visited)}
 
   /* ── Node image layouts ──────────────────────────────────── */
   /* split: text left, images right */
@@ -234,12 +238,13 @@
   .minimap .mm-dot.visited{fill:var(--visited)}
   .minimap .mm-line{stroke:var(--line);stroke-width:1;fill:none}
   .minimap.hidden{opacity:0;pointer-events:none}
-  .overview-btn{position:absolute;left:16px;bottom:16px;appearance:none;
-    border:1px solid var(--line);background:var(--surface);color:var(--mute);
-    width:28px;height:28px;border-radius:4px;cursor:pointer;display:flex;
+  .overview-btn{position:absolute;left:20px;bottom:24px;appearance:none;
+    border:1px solid var(--line);background:var(--surface);color:var(--ink);
+    width:44px;height:44px;border-radius:50%;cursor:pointer;display:flex;
     align-items:center;justify-content:center;z-index:5;
-    transition:opacity 120ms var(--ease),color 120ms var(--ease),border-color 120ms var(--ease)}
-  .overview-btn:hover{color:var(--ink);border-color:var(--ink2)}
+    box-shadow:0 2px 6px rgba(0,0,0,.12);
+    transition:border-color 120ms var(--ease)}
+  .overview-btn:hover{border-color:var(--ink2)}
   body.present .overview-btn{display:none}
 
   /* Empty state */
@@ -671,9 +676,9 @@
     </div>
 
     <button class="overview-btn" id="overview-btn" title="Overview — fit all (0)">
-      <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
-        <rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/>
-        <rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/>
+      <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="1,5 1,1 5,1"/><line x1="1" y1="1" x2="6" y2="6"/>
+        <polyline points="15,11 15,15 11,15"/><line x1="15" y1="15" x2="10" y2="10"/>
       </svg>
     </button>
 
@@ -1877,7 +1882,7 @@ function updateNavButtons(){
 }
 
 // ── Persistence ──────────────────────────────────────────────
-const APP_VERSION = '2.10.0';
+const APP_VERSION = '2.11.0';
 const STORAGE_KEY = 'demka.md';
 const IMG_KEY_PREFIX = 'demka.img.';
 
@@ -2040,6 +2045,62 @@ document.addEventListener('mousemove', e => {
   focusOnActive({ distance:0 });
 });
 document.addEventListener('mouseup', ()=>{ dragging=false; document.body.style.cursor=''; });
+
+// ── Canvas pan & zoom ─────────────────────────────────────────
+{
+  let panActive = false, panStart = {x:0,y:0}, camAtPan = {x:0,y:0,scale:1};
+
+  canvas.addEventListener('pointerdown', e => {
+    if (state.present) return;
+    if (e.target.closest('.node, button')) return;
+    panActive = true;
+    panStart = {x: e.clientX, y: e.clientY};
+    camAtPan = {...state.cam};
+    canvas.setPointerCapture(e.pointerId);
+    canvas.classList.add('panning');
+    world.style.transition = 'none';
+    e.preventDefault();
+  });
+
+  canvas.addEventListener('pointermove', e => {
+    if (!panActive) return;
+    applyCam(
+      camAtPan.x + e.clientX - panStart.x,
+      camAtPan.y + e.clientY - panStart.y,
+      camAtPan.scale, 0
+    );
+  });
+
+  const endPan = e => {
+    if (!panActive) return;
+    panActive = false;
+    canvas.releasePointerCapture(e.pointerId);
+    canvas.classList.remove('panning');
+    world.style.transition = '';
+  };
+  canvas.addEventListener('pointerup', endPan);
+  canvas.addEventListener('pointercancel', endPan);
+
+  canvas.addEventListener('wheel', e => {
+    if (state.present) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    const newScale = Math.max(0.1, Math.min(4, state.cam.scale * factor));
+    const ratio = newScale / state.cam.scale;
+    world.style.transition = 'none';
+    applyCam(
+      mx - (mx - state.cam.x) * ratio,
+      my - (my - state.cam.y) * ratio,
+      newScale, 0
+    );
+    // Restore transition shortly after wheel stops
+    clearTimeout(canvas._wheelTimer);
+    canvas._wheelTimer = setTimeout(() => { world.style.transition = ''; }, 150);
+  }, {passive: false});
+}
 
 // ── Editor ───────────────────────────────────────────────────
 editor.addEventListener('paste', e => {
@@ -2807,7 +2868,7 @@ $('#view-popup').querySelectorAll('.view-opt').forEach(btn => {
     applyViewClass();
     closeViewPopup();
     doRebuild();
-    focusOnActive({ distance:0 });
+    zoomFitAll();
   });
 });
 
