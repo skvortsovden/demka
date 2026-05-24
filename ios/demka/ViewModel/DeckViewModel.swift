@@ -7,6 +7,7 @@ private let kTheme    = "demka.theme"
 private let kReveal   = "demka.reveal"
 private let kTimer    = "demka.timer"
 private let kCards    = "demka.cards"
+private let kZoom     = "demka.zoom"
 
 @MainActor
 final class DeckViewModel: ObservableObject {
@@ -34,6 +35,9 @@ final class DeckViewModel: ObservableObject {
     }
     @Published var cardsVisible: Bool {
         didSet { UserDefaults.standard.set(cardsVisible, forKey: kCards) }
+    }
+    @Published var zoomEnabled: Bool {
+        didSet { UserDefaults.standard.set(zoomEnabled, forKey: kZoom) }
     }
     @Published var timerEnabled: Bool {
         didSet {
@@ -66,6 +70,7 @@ final class DeckViewModel: ObservableObject {
 
         self.revealEnabled = UserDefaults.standard.object(forKey: kReveal) as? Bool ?? true
         self.cardsVisible  = UserDefaults.standard.object(forKey: kCards) as? Bool ?? true
+        self.zoomEnabled   = UserDefaults.standard.object(forKey: kZoom)  as? Bool ?? false
         self.timerEnabled  = UserDefaults.standard.object(forKey: kTimer) as? Bool ?? false
 
         rebuild()
@@ -130,12 +135,29 @@ final class DeckViewModel: ObservableObject {
         return c
     }
 
+    func zoomToReveal() {
+        guard zoomEnabled, revealEnabled, activeIndex < nodes.count else { return }
+        let node = nodes[activeIndex]
+        let vw = viewportSize.width, vh = viewportSize.height
+        let pad: CGFloat = 60
+        var base = min(vw / (node.w + pad * 2), vh / (node.h + pad * 2))
+        base = min(base, 1.55); base = max(base, 0.5)
+        let s = base * 1.3
+        let tx = vw / 2 - (node.x + node.w / 2) * s
+        let ty = vh / 2 - (node.y + node.h / 2) * s
+        withAnimation(.easeInOut(duration: 0.28)) {
+            camScale = s
+            camOffset = CGSize(width: tx, height: ty)
+        }
+    }
+
     func advance() {
         guard !nodes.isEmpty else { return }
         let cur = nodes[activeIndex]
         let tot = totalRevealSteps(for: cur)
         if revealEnabled && bulletsShown < tot {
             withAnimation(.easeOut(duration: 0.18)) { bulletsShown += 1 }
+            zoomToReveal()
             return
         }
         if activeIndex < nodes.count - 1 {
@@ -153,6 +175,8 @@ final class DeckViewModel: ObservableObject {
         guard !nodes.isEmpty else { return }
         if revealEnabled && bulletsShown > 0 {
             withAnimation(.easeOut(duration: 0.18)) { bulletsShown -= 1 }
+            if bulletsShown == 0 { focusCamera(on: activeIndex, animated: true) }
+            else { zoomToReveal() }
             return
         }
         if activeIndex > 0 {

@@ -9,6 +9,7 @@ struct DeckView: View {
     @State private var pinchStartOffset: CGSize = .zero
     @State private var isPinching = false
     @State private var showRevealToast = false
+    @State private var showZoomToast = false
     @State private var showCardsToast = false
     @State private var showTimerToast = false
     @State private var toastTask: Task<Void, Never>? = nil
@@ -108,6 +109,21 @@ struct DeckView: View {
             // Timer toast
             if showTimerToast {
                 Text(vm.timerEnabled ? "Timer enabled" : "Timer disabled")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(vm.theme.bg)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(vm.theme.ink.opacity(0.82))
+                    .clipShape(Capsule())
+                    .allowsHitTesting(false)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 60)
+            }
+
+            // Zoom toast
+            if showZoomToast {
+                Text(vm.zoomEnabled ? "Zoom enabled" : "Zoom disabled")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(vm.theme.bg)
                     .padding(.horizontal, 16)
@@ -224,6 +240,24 @@ struct DeckView: View {
             Image(systemName: "timer")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(vm.timerEnabled ? vm.theme.active : vm.theme.mute)
+        }
+    }
+
+    // MARK: - Zoom toggle
+    private var zoomToggle: some View {
+        Button {
+            vm.zoomEnabled.toggle()
+            withAnimation(.spring(response: 0.25)) { showZoomToast = true; showRevealToast = false; showCardsToast = false; showTimerToast = false }
+            toastTask?.cancel()
+            toastTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.5))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.25)) { showZoomToast = false }
+            }
+        } label: {
+            Image(systemName: "plus.magnifyingglass")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(vm.zoomEnabled ? vm.theme.active : vm.theme.mute)
         }
     }
 
@@ -355,9 +389,10 @@ struct DeckView: View {
 
             Spacer()
 
-            // ── Centre: Reveal · Cards · Timer ───────────────
+            // ── Centre: Reveal · Zoom · Cards · Timer ────────
             HStack(spacing: 20) {
                 revealToggle
+                zoomToggle
                 cardsToggle
                 timerToggle
             }
