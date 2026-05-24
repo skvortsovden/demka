@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct DeckView: View {
     @EnvironmentObject var vm: DeckViewModel
@@ -12,6 +13,8 @@ struct DeckView: View {
     @State private var toastTask: Task<Void, Never>? = nil
     @State private var showViewModePicker = false
     @State private var showThemePicker = false
+    @State private var showShareConfirm = false
+    @State private var shareURL: URL? = nil
 
     var body: some View {
         ZStack {
@@ -128,6 +131,13 @@ struct DeckView: View {
         }
         .sheet(isPresented: $showHelp) {
             HelpView().environmentObject(vm)
+        }
+        .sheet(isPresented: $showShareConfirm) {
+            ShareConfirmSheet(shareURL: $shareURL, onDismiss: { showShareConfirm = false })
+                .environmentObject(vm)
+        }
+        .sheet(item: $shareURL) { url in
+            ShareSheet(url: url)
         }
     }
 
@@ -312,24 +322,41 @@ struct DeckView: View {
 
             Spacer()
 
-            // ── Right: Present ───────────────────────────────
-            Button {
-                vm.isPresenting = true
-                vm.activeIndex = 0
-                vm.bulletsShown = 0
-                vm.focusCamera(on: 0, animated: true)
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 11))
-                    Text("Present")
-                        .font(.system(size: 13, weight: .semibold))
+            // ── Right: Share + Present ───────────────────────
+            HStack(spacing: 12) {
+                Button {
+                    showShareConfirm = true
+                } label: {
+                    if vm.isCreatingShare {
+                        ProgressView()
+                            .scaleEffect(0.75)
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(vm.theme.ink)
+                    }
                 }
-                .foregroundColor(vm.theme.bg)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(vm.theme.active)
-                .cornerRadius(4)
+                .disabled(vm.isCreatingShare)
+
+                Button {
+                    vm.isPresenting = true
+                    vm.activeIndex = 0
+                    vm.bulletsShown = 0
+                    vm.focusCamera(on: 0, animated: true)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 11))
+                        Text("Present")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundColor(vm.theme.bg)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(vm.theme.active)
+                    .cornerRadius(4)
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -442,5 +469,97 @@ struct DeckView: View {
                 pinchStartScale = vm.camScale
                 pinchStartOffset = vm.camOffset
             }
+    }
+}
+
+extension URL: @retroactive Identifiable {
+    public var id: String { absoluteString }
+}
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+    func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
+}
+
+struct ShareConfirmSheet: View {
+    @EnvironmentObject var vm: DeckViewModel
+    @Binding var shareURL: URL?
+    var onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Share demka")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(vm.theme.ink)
+                .padding(.bottom, 16)
+
+            VStack(alignment: .leading, spacing: 8) {
+                noteRow("Your demka will be saved to the cloud.")
+                noteRow("Anyone with the link can view it — no account needed.")
+                noteRow("Link is stored for 1 month.")
+            }
+
+            Spacer()
+
+            HStack(spacing: 10) {
+                Button("Cancel") {
+                    onDismiss()
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(vm.theme.ink)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 9)
+                .background(vm.theme.surface)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(vm.theme.line, lineWidth: 1))
+                .cornerRadius(6)
+
+                Spacer()
+
+                Button {
+                    onDismiss()
+                    Task {
+                        if let url = await vm.createShare() {
+                            shareURL = url
+                        }
+                    }
+                } label: {
+                    if vm.isCreatingShare {
+                        ProgressView()
+                            .tint(vm.theme.bg)
+                            .frame(width: 80)
+                    } else {
+                        Text("Create link")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(vm.theme.bg)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 9)
+                .background(vm.theme.active)
+                .cornerRadius(6)
+                .disabled(vm.isCreatingShare)
+            }
+            .padding(.bottom, 8)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(vm.theme.bg.ignoresSafeArea())
+        .presentationDetents([.height(280)])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func noteRow(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("·")
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundColor(vm.theme.ink)
+            Text(text)
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundColor(vm.theme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }

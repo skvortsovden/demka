@@ -229,8 +229,9 @@ final class DeckViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Share loading
+    // MARK: - Share loading / creating
     @Published var isLoadingShare = false
+    @Published var isCreatingShare = false
     @Published var shareError: String? = nil
 
     func handleIncomingURL(_ url: URL) {
@@ -244,13 +245,16 @@ final class DeckViewModel: ObservableObject {
         Task { await loadShare(id: shareId) }
     }
 
-    @MainActor private func loadShare(id: String) async {
+    @Published private(set) var currentShareId: String? = nil
+
+    @MainActor private func loadShare(id: String, switchView: Bool = true) async {
         isLoadingShare = true
         shareError = nil
         do {
             let md = try await fetchFirestoreShare(id: id)
             markdown = md
-            showEditor = false
+            currentShareId = id
+            if switchView { showEditor = false }
             rebuild()
         } catch {
             shareError = error.localizedDescription
@@ -258,10 +262,72 @@ final class DeckViewModel: ObservableObject {
         isLoadingShare = false
     }
 
+    @MainActor func refreshShare() async {
+        guard let id = currentShareId else { return }
+        isLoadingShare = true
+        do {
+            let md = try await fetchFirestoreShare(id: id)
+            markdown = md
+            rebuild()
+        } catch {
+            let msg = error.localizedDescription
+            Task {
+                try? await Task.sleep(for: .milliseconds(400))
+                shareError = msg
+            }
+        }
+        isLoadingShare = false
+    }
+
+    @MainActor func createShare() async -> URL? {
+        isCreatingShare = true
+        shareError = nil
+        do {
+            let url = try await postFirestoreShare(markdown: markdown)
+            isCreatingShare = false
+            return url
+        } catch {
+            shareError = error.localizedDescription
+            isCreatingShare = false
+            return nil
+        }
+    }
+
+    private func postFirestoreShare(markdown: String) async throws -> URL {
+        let urlStr = "https://firestore.googleapis.com/v1/projects/demka-944f1/databases/(default)/documents/shares?key=AIzaSyBMQMTFQwWaqDcId-knFXw0Fh5VQCqQo3k"
+        guard let apiURL = URL(string: urlStr) else { throw URLError(.badURL) }
+        let formatter = ISO8601DateFormatter()
+        let body: [String: Any] = [
+            "fields": [
+                "md":        ["stringValue": markdown],
+                "imgs":      ["mapValue": ["fields": [:] as [String: Any]]],
+                "created":   ["timestampValue": formatter.string(from: Date())],
+                "expiresAt": ["timestampValue": formatter.string(from: Date().addingTimeInterval(30 * 24 * 60 * 60))]
+            ]
+        ]
+        var request = URLRequest(url: apiURL)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NSError(domain: "demka", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to create share"])
+        }
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+        guard let name = json["name"] as? String,
+              let id = name.components(separatedBy: "/").last, !id.isEmpty,
+              let url = URL(string: "https://www.demka.in.ua/#share:\(id)") else {
+            throw NSError(domain: "demka", code: 3, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+        }
+        return url
+    }
+
     private func fetchFirestoreShare(id: String) async throws -> String {
         let urlStr = "https://firestore.googleapis.com/v1/projects/demka-944f1/databases/(default)/documents/shares/\(id)?key=AIzaSyBMQMTFQwWaqDcId-knFXw0Fh5VQCqQo3k"
         guard let url = URL(string: urlStr) else { throw URLError(.badURL) }
-        let (data, response) = try await URLSession.shared.data(from: url)
+        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData)
+        req.setValue("no-cache, no-store", forHTTPHeaderField: "Cache-Control")
+        let (data, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw NSError(domain: "demka", code: 0, userInfo: [NSLocalizedDescriptionKey: "Share not found"])
         }

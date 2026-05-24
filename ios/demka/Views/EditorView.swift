@@ -7,7 +7,9 @@ private struct MarkdownTextEditor: UIViewRepresentable {
     @Binding var text: String
     var inkColor: UIColor
     var bgColor: UIColor
+    var refreshTint: UIColor = .systemGray
     var onSetup: ((UITextView) -> Void)? = nil
+    var onRefresh: (() async -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -25,11 +27,19 @@ private struct MarkdownTextEditor: UIViewRepresentable {
         tv.autocapitalizationType = .none
         tv.smartQuotesType = .no
         tv.smartDashesType = .no
+        tv.alwaysBounceVertical = true
+
+        let rc = UIRefreshControl()
+        rc.tintColor = refreshTint
+        rc.addTarget(context.coordinator, action: #selector(Coordinator.handleRefresh(_:)), for: .valueChanged)
+        tv.refreshControl = rc
+
         onSetup?(tv)
         return tv
     }
 
     func updateUIView(_ tv: UITextView, context: Context) {
+        context.coordinator.parent = self
         if tv.text != text { tv.text = text }
         tv.textColor = inkColor
         tv.backgroundColor = bgColor
@@ -39,6 +49,13 @@ private struct MarkdownTextEditor: UIViewRepresentable {
         var parent: MarkdownTextEditor
         init(_ parent: MarkdownTextEditor) { self.parent = parent }
         func textViewDidChange(_ textView: UITextView) { parent.text = textView.text }
+
+        @objc func handleRefresh(_ control: UIRefreshControl) {
+            Task { @MainActor in
+                await parent.onRefresh?()
+                control.endRefreshing()
+            }
+        }
     }
 }
 
@@ -96,7 +113,9 @@ struct EditorView: View {
                     text: $vm.markdown,
                     inkColor: UIColor(vm.theme.ink),
                     bgColor:  UIColor(vm.theme.bg),
-                    onSetup:  { tv in store.textView = tv }
+                    refreshTint: UIColor(vm.theme.ink2),
+                    onSetup:  { tv in store.textView = tv },
+                    onRefresh: { await vm.refreshShare() }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
