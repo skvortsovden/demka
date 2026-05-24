@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="utf-8" />
+<title>Privacy Policy — demka</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="icon" type="image/png" href="assets/demka-logo-bg.png" />
+<link rel="preconnect" href="https://fonts.macpaw.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.macpaw.com/css?family=Fixel:wght@400;500;600;700;800&display=swap" />
+<style>
+  :root {
+    --bg:#dbdad7; --surface:#eeedea; --ink:#1a1a18; --ink2:#5a5a56; --mute:#9a9a95;
+    --line:#b8b7b3; --active:#2e2e2a;
+    --font:"Fixel",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.6;min-height:100vh}
+  header{display:flex;align-items:center;padding:0 24px;height:52px;background:var(--bg);border-bottom:1px solid var(--line)}
+  .logo{font-weight:800;font-size:18px;letter-spacing:-.02em;color:var(--ink);text-decoration:none;display:flex;align-items:baseline;gap:8px}
+  .logo .dot{width:8px;height:8px;background:var(--active);display:inline-block;border-radius:2px;transform:translateY(-2px)}
+  main{max-width:640px;margin:0 auto;padding:48px 24px 80px}
+  h1{font-size:28px;font-weight:800;letter-spacing:-.02em;margin-bottom:8px}
+  .updated{font-size:13px;color:var(--mute);margin-bottom:40px}
+  h2{font-size:16px;font-weight:700;margin:32px 0 8px}
+  p{color:var(--ink2);margin-bottom:12px}
+  p:last-child{margin-bottom:0}
+  ul{color:var(--ink2);padding-left:20px;margin-bottom:12px}
+  li{margin-bottom:4px}
+  a{color:var(--ink);text-underline-offset:3px}
+  .section{border-top:1px solid var(--line);padding-top:32px;margin-top:32px}
+  .section:first-of-type{border-top:none;padding-top:0;margin-top:0}
+</style>
+<body>
+
+<header>
+  <a class="logo" href="/">demka<span class="dot"></span></a>
+</header>
+
+<main>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: May 2025</p>
+
+  <div class="section">
+    <h2>Overview</h2>
+    <p>demka is a markdown-to-slides tool. We do not require accounts, do not sell data, and do not track you personally. This page explains what limited data is collected and why.</p>
+  </div>
+
+  <div class="section">
+    <h2>Data we do not collect</h2>
+    <ul>
+      <li>No accounts or sign-up</li>
+      <li>No names, emails, or contact details</li>
+      <li>No payment information</li>
+      <li>No location data</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Analytics (web)</h2>
+    <p>The demka website uses <strong>Google Analytics</strong> to understand aggregate usage (page views, session counts, device types). Google Analytics may set cookies and collect your IP address and browser information. This data is processed by Google under their <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</p>
+    <p>No analytics are collected by the iOS app.</p>
+  </div>
+
+  <div class="section">
+    <h2>Share links</h2>
+    <p>When you use the <strong>Share</strong> feature (web or iOS), the content of your current presentation (the markdown text) is sent to and stored in Google Firestore. This allows anyone with the link to view the shared deck.</p>
+    <ul>
+      <li>Shared decks are stored for up to 30 days, then automatically deleted.</li>
+      <li>No personal information is attached to shared content.</li>
+      <li>Do not share content that contains confidential or sensitive information.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Local storage</h2>
+    <p>The web app stores your presentation content and preferences (theme, view mode, etc.) in your browser's <strong>localStorage</strong>. This data never leaves your device except when you explicitly use the Share feature.</p>
+    <p>The iOS app stores the same data using <strong>UserDefaults</strong>, which is local to your device and not synced or transmitted.</p>
+  </div>
+
+  <div class="section">
+    <h2>Third-party services</h2>
+    <ul>
+      <li><strong>Google Analytics</strong> — web usage analytics (<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>)</li>
+      <li><strong>Google Firestore</strong> — storage for share links (<a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Firebase Privacy</a>)</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Children</h2>
+    <p>demka is not directed at children under 13. We do not knowingly collect any information from children.</p>
+  </div>
+
+  <div class="section">
+    <h2>Changes</h2>
+    <p>If this policy changes materially, we will update the date at the top of this page.</p>
+  </div>
+
+  <div class="section">
+    <h2>Contact</h2>
+    <p>Questions? Open an issue at <a href="https://github.com/skvortsovden/demka" target="_blank" rel="noopener">github.com/skvortsovden/demka</a>.</p>
+  </div>
+</main>
+
+</body>
+</html>
