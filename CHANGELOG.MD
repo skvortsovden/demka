@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.13.0] - 2026-05-25
+
+### Added
+- Ukrainian translations for template confirm modal (`tplModalTitle`, `tplModalBody`, `tplModalCancel`, `tplModalInsert`)
+- Ukrainian template variants: `ukr/4-mind-map.md`, `ukr/hackaton-pitch.md`; language-specific `index.json` manifests in `eng/` and `ukr/`
+- Template picker loads templates from language-specific subdirectory (`eng/` or `ukr/`) based on current UI language; reloads on language switch
+- Privacy policy page at `docs/privacy.html` (covers analytics, share links, local storage)
+
+### Changed
+- Template confirm replaced browser `confirm()` with custom modal ("Insert template" / warning text / Cancel + Insert buttons)
+- Nested bullet points now render as flat siblings in a single `<ul>` with `margin-left` depth indentation — eliminates CSS opacity compounding between parent and child `li` elements during reveal
+- Bullet reveal transition moved to `.shown` state only: hiding is instant, revealing animates in — fixes gray flash when card first becomes active in presentation mode
+- Nested `li` no longer carry their own `color` override; all bullets inherit color uniformly
+
+---
+
 ## [2.12.0] - 2026-05-24
 
 ### Added
