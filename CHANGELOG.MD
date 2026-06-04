@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.14.0] - 2026-06-05
+
+### Added
+- Autoplay button in the topbar (after Present): picks an interval (3 s, 5 s, 10 s, 30 s, 1 min) and auto-advances slides, entering presentation mode automatically; stops at the last slide or on Esc
+
+---
+
 ## [2.13.0] - 2026-05-25
 
 ### Added
