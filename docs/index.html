@@ -624,10 +624,15 @@
     <span class="toggle-track"><span class="toggle-thumb"></span></span>
     <span class="toggle-label" id="cards-label">Cards</span>
   </label>
+  <label class="toggle-sw" title="Reveal bullets one by one in presentation mode">
+    <input type="checkbox" id="reveal-check" checked>
+    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+    <span class="toggle-label" id="reveal-label">Reveal</span>
+  </label>
   <label class="toggle-sw" title="Zoom in on bullet reveal">
     <input type="checkbox" id="zoom-check" checked>
     <span class="toggle-track"><span class="toggle-thumb"></span></span>
-    <span class="toggle-label">Zoom</span>
+    <span class="toggle-label" id="zoom-label">Zoom</span>
   </label>
   <label class="toggle-sw" title="Show/hide timer">
     <input type="checkbox" id="timer-check">
@@ -954,6 +959,9 @@ const STRINGS = {
     logoSubtitle: '· markdown → slides',
     cardsLabel: 'Cards',
     timerLabel: 'Timer',
+    revealLabel: 'Reveal',
+    zoomLabel: 'Zoom',
+    autoplayBtn: '&#9654;&#9654; Autoplay <span class="arrow">▾</span>',
     recordBtn: '&#9679; Record',
     recordStop: '&#9632; Stop',
     recordModalTitle: 'Screen recording',
@@ -1050,6 +1058,9 @@ const STRINGS = {
     logoSubtitle: '· markdown → слайди',
     cardsLabel: 'Картки',
     timerLabel: 'Таймер',
+    revealLabel: 'Сходи',
+    zoomLabel: 'Зум',
+    autoplayBtn: '&#9654;&#9654; Автоплей <span class="arrow">▾</span>',
     recordBtn: '&#9679; Запис',
     recordStop: '&#9632; Стоп',
     recordModalTitle: 'Запис екрану',
@@ -1151,6 +1162,9 @@ function applyLang(){
   document.querySelector('.logo small').innerHTML = s.logoSubtitle;
   document.getElementById('cards-label').textContent = s.cardsLabel;
   document.getElementById('timer-label').textContent = s.timerLabel;
+  document.getElementById('reveal-label').textContent = s.revealLabel;
+  document.getElementById('zoom-label').textContent = s.zoomLabel;
+  if (!_autoTimer) autoBtn.innerHTML = s.autoplayBtn;
   document.getElementById('rec-modal-title').textContent = s.recordModalTitle;
   document.getElementById('rec-modal-body').innerHTML = s.recordModalBody.map(t => `<li>${t}</li>`).join('');
   document.getElementById('rec-modal-ok').textContent = s.recordModalOk;
@@ -1538,6 +1552,7 @@ const state = {
   viewMode: 'timeline',
   inFitAll: false,
   zoomEnabled: true,
+  revealEnabled: true,
 };
 
 function totalRevealSteps(n){
@@ -1886,7 +1901,7 @@ function goTo(idx, opts={}){
   state.activeIdx = idx;
   if (state.present && prev !== idx) timerResetSlide();
   const cur = state.nodes[idx];
-  state.bulletsShown = opts.reveal === 'all' ? totalRevealSteps(cur) : 0;
+  state.bulletsShown = (opts.reveal === 'all' || !state.revealEnabled) ? totalRevealSteps(cur) : 0;
   updateActive();
   focusOnActive({ distance });
   updateMinimap();
@@ -1897,7 +1912,7 @@ function advance(){
   const cur = state.nodes[state.activeIdx];
   if (!cur) return;
   const tot = totalRevealSteps(cur);
-  if (state.bulletsShown < tot){
+  if (state.revealEnabled && state.bulletsShown < tot){
     state.bulletsShown++;
     updateActive();
     updateNavButtons();
@@ -1909,7 +1924,7 @@ function advance(){
 function back(){
   const cur = state.nodes[state.activeIdx];
   if (!cur) return;
-  if (state.bulletsShown > 0){
+  if (state.revealEnabled && state.bulletsShown > 0){
     state.bulletsShown--;
     updateActive();
     updateNavButtons();
@@ -1997,7 +2012,7 @@ function updateNavButtons(){
 }
 
 // ── Persistence ──────────────────────────────────────────────
-const APP_VERSION = '2.14.0';
+const APP_VERSION = '2.15.0';
 const STORAGE_KEY = 'demka.md';
 const IMG_KEY_PREFIX = 'demka.img.';
 
@@ -2087,7 +2102,8 @@ function togglePresent(){
   state.present = !state.present;
   document.body.classList.toggle('present', state.present);
   if (state.present){
-    state.bulletsShown = 0;
+    const cur = state.nodes[state.activeIdx];
+    state.bulletsShown = (!state.revealEnabled && cur) ? totalRevealSteps(cur) : 0;
     state.visited.clear();
     presentBtn.textContent = STRINGS[lang].presentExit;
     showHint();
@@ -2157,6 +2173,7 @@ const autoPopup = $('#auto-popup');
 function startAuto(){
   stopAuto();
   if (!state.present) togglePresent();
+  goTo(0);
   _autoTimer = setInterval(() => {
     const isLast = state.activeIdx >= state.nodes.length - 1
                 && state.bulletsShown >= totalRevealSteps(state.nodes[state.activeIdx]);
@@ -2170,7 +2187,7 @@ function startAuto(){
 function stopAuto(){
   if (_autoTimer){ clearInterval(_autoTimer); _autoTimer = null; }
   autoBtn.classList.remove('running');
-  autoBtn.innerHTML = '&#9654;&#9654; Autoplay <span class="arrow">▾</span>';
+  autoBtn.innerHTML = STRINGS[lang].autoplayBtn;
 }
 
 autoBtn.addEventListener('click', e => {
@@ -2738,6 +2755,17 @@ const cardsCheck = $('#cards-check');
 cardsCheck.addEventListener('change', () => {
   document.body.classList.toggle('no-cards', !cardsCheck.checked);
   localStorage.setItem('demka.cards', cardsCheck.checked ? 'on' : 'off');
+});
+
+// ── Reveal toggle ────────────────────────────────────────────
+const revealCheck = $('#reveal-check');
+(function initRevealToggle(){
+  const off = localStorage.getItem('demka.reveal') === 'off';
+  if (off){ state.revealEnabled = false; revealCheck.checked = false; }
+})();
+revealCheck.addEventListener('change', () => {
+  state.revealEnabled = revealCheck.checked;
+  localStorage.setItem('demka.reveal', revealCheck.checked ? 'on' : 'off');
 });
 
 // ── Zoom toggle ───────────────────────────────────────────────

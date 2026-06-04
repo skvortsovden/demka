@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.15.0] - 2026-06-05
+
+### Added
+- Reveal toggle to enable/disable one-by-one bullet reveal in presentation mode
+- Ukrainian translations for new controls: Autoplay → Автоплей, Reveal → Сходи, Zoom → Зум
+
+### Changed
+- Autoplay always starts from the first card
+- Back navigation respects the Reveal toggle (no bullet-by-bullet stepping when disabled)
+
+---
+
 ## [2.14.0] - 2026-06-05
 
 ### Added
