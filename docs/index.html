@@ -2442,31 +2442,28 @@ document.addEventListener('fullscreenchange', ()=>{
 });
 
 // ── Remote control (WebRTC + Firestore signalling, no PeerJS) ──
-const FS_BASE = 'https://firestore.googleapis.com/v1/projects/demka-944f1/databases/(default)/documents';
-const FS_KEY  = 'AIzaSyBMQMTFQwWaqDcId-knFXw0Fh5VQCqQo3k';
 const ICE_CFG = { iceServers: [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' }
 ]};
 
+// Use the same Firebase SDK + App Check instance as the share feature
 async function fsWrite(code, fields){
-  const body = { fields: Object.fromEntries(
-    Object.entries(fields).map(([k,v]) => [k, { stringValue: String(v) }])
-  )};
-  const r = await fetch(`${FS_BASE}/remotes/wc-${code}?key=${FS_KEY}`, {
-    method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
-  });
-  if (!r.ok) throw new Error('Firestore write failed: ' + r.status);
+  const { db, doc, setDoc } = await getFirebase();
+  await setDoc(doc(db, 'clicker', code), fields);
 }
 async function fsRead(code){
-  const r = await fetch(`${FS_BASE}/remotes/wc-${code}?key=${FS_KEY}`);
-  if (!r.ok) return null;
-  const doc = await r.json();
-  if (!doc.fields) return null;
-  return Object.fromEntries(Object.entries(doc.fields).map(([k,v]) => [k, v.stringValue || '']));
+  try {
+    const { db, doc, getDoc } = await getFirebase();
+    const snap = await getDoc(doc(db, 'clicker', code));
+    return snap.exists() ? snap.data() : null;
+  } catch(e){ return null; }
 }
 async function fsDelete(code){
-  await fetch(`${FS_BASE}/remotes/wc-${code}?key=${FS_KEY}`, { method: 'DELETE' }).catch(()=>{});
+  try {
+    const { db, doc, deleteDoc } = await getFirebase();
+    await deleteDoc(doc(db, 'clicker', code));
+  } catch(e){}
 }
 
 async function gatherIce(pc){
@@ -2582,9 +2579,12 @@ async function openRemoteModal(){
     await gatherIce(pc);
     await fsWrite(code, { offer: pc.localDescription.sdp });
   } catch(e) {
+    ch.onclose = null;
+    pc.onconnectionstatechange = null;
     _hostPC = null;
     pc.close();
-    $('#remote-status-text').textContent = 'Error: ' + e.message;
+    remoteStatusKey = 'remoteDisconnected';
+    $('#remote-status-text').textContent = 'Setup error: ' + e.message;
     return;
   }
 
@@ -3203,7 +3203,7 @@ let currentShareId = null;
 
 async function getFirebase(){
   if (_firebase) return _firebase;
-  const [{ initializeApp }, { getFirestore, doc, addDoc, setDoc, getDoc, collection, serverTimestamp }, { initializeAppCheck, ReCaptchaV3Provider }] = await Promise.all([
+  const [{ initializeApp }, { getFirestore, doc, addDoc, setDoc, getDoc, deleteDoc, collection, serverTimestamp }, { initializeAppCheck, ReCaptchaV3Provider }] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js'),
     import('https://www.gstatic.com/firebasejs/12.13.0/firebase-app-check.js'),
@@ -3214,7 +3214,7 @@ async function getFirebase(){
     isTokenAutoRefreshEnabled: true,
   });
   const db = getFirestore(app);
-  _firebase = { db, doc, addDoc, setDoc, getDoc, collection, serverTimestamp };
+  _firebase = { db, doc, addDoc, setDoc, getDoc, deleteDoc, collection, serverTimestamp };
   return _firebase;
 }
 
