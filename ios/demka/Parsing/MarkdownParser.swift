@@ -22,6 +22,8 @@ struct MarkdownParser {
         }
 
         var inCode = false
+        var inNotes = false
+        var noteLines: [String] = []
         var currentBulletPath: [Bullet] = []
 
         for raw in lines {
@@ -31,6 +33,34 @@ struct MarkdownParser {
                 continue
             }
             if inCode { continue }
+
+            let trimmed = raw.trimmingCharacters(in: .whitespaces)
+
+            // Notes block (accumulate until closing ---)
+            if inNotes {
+                if trimmed == "---" {
+                    currentNode()?.notes = noteLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+                    noteLines = []
+                    inNotes = false
+                } else {
+                    noteLines.append(trimmed)
+                }
+                continue
+            }
+
+            // Single-line notes: ---text--- or --- text ---
+            if trimmed.hasPrefix("---"), trimmed.hasSuffix("---"), trimmed.count > 6 {
+                let inner = String(trimmed.dropFirst(3).dropLast(3)).trimmingCharacters(in: .whitespaces)
+                if !inner.isEmpty { currentNode()?.notes = inner }
+                continue
+            }
+
+            // Start of multi-line notes block
+            if trimmed == "---" {
+                inNotes = true
+                noteLines = []
+                continue
+            }
 
             // Heading: #, ##, ###
             if let (level, text) = parseHeading(raw) {

@@ -5,7 +5,11 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            if vm.showEditor {
+            if vm.isClickerMode {
+                ClickerRemoteView()
+                    .environmentObject(vm)
+                    .transition(.opacity)
+            } else if vm.showEditor {
                 EditorView()
                     .transition(.asymmetric(
                         insertion: .move(edge: .leading),
@@ -26,8 +30,10 @@ struct ContentView: View {
                     .tint(.white)
                     .scaleEffect(1.4)
             }
+
         }
         .animation(.easeInOut(duration: 0.3), value: vm.showEditor)
+        .animation(.easeInOut(duration: 0.3), value: vm.isClickerMode)
         .alert("Could not load share", isPresented: Binding(
             get: { vm.shareError != nil },
             set: { if !$0 { vm.shareError = nil } }

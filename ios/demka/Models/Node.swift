@@ -7,6 +7,7 @@ final class Node: Identifiable {
     var title: String
     var lede: String = ""
     var bullets: [Bullet] = []
+    var notes: String = ""
     var children: [Node] = []
     weak var parent: Node?
     // layout

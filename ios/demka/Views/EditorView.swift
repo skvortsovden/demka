@@ -69,6 +69,10 @@ struct EditorView: View {
     @EnvironmentObject var vm: DeckViewModel
     @StateObject private var store = TextViewStore()
     @State private var keyboardVisible = false
+    @State private var showShareConfirm = false
+    @State private var showAbout = false
+    @State private var shareURL: URL? = nil
+    @State private var exportURL: URL? = nil
 
     var body: some View {
         ZStack {
@@ -77,29 +81,68 @@ struct EditorView: View {
             VStack(spacing: 0) {
                 // ── Top toolbar ──────────────────────────────
                 HStack {
-                    Text("demka")
-                        .font(.system(size: 18, weight: .black))
-                        .foregroundColor(vm.theme.ink)
+                    Button { showAbout = true } label: {
+                        Text("demka")
+                            .font(.system(size: 18, weight: .black))
+                            .foregroundColor(vm.theme.ink)
+                    }
 
                     Spacer()
 
-                    Button {
-                        vm.rebuild()
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            vm.showEditor = false
+                    HStack(spacing: 12) {
+                        Menu {
+                            Button {
+                                showShareConfirm = true
+                            } label: {
+                                Label("Share link", systemImage: "link")
+                            }
+                            Button {
+                                Task {
+                                    if let url = await vm.exportPDF() {
+                                        exportURL = url
+                                    }
+                                }
+                            } label: {
+                                Label("Export PDF", systemImage: "doc.richtext")
+                            }
+                            Button {
+                                if let url = vm.exportMarkdown() {
+                                    exportURL = url
+                                }
+                            } label: {
+                                Label("Export Markdown", systemImage: "doc.text")
+                            }
+                        } label: {
+                            if vm.isCreatingShare || vm.isExportingPDF {
+                                ProgressView()
+                                    .scaleEffect(0.75)
+                                    .frame(width: 20, height: 20)
+                            } else {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(vm.theme.ink)
+                            }
                         }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text("View")
-                            Text("→")
+                        .disabled(vm.isCreatingShare || vm.isExportingPDF)
+
+                        Button {
+                            vm.rebuild()
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                vm.showEditor = false
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("View")
+                                Text("→")
+                            }
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(vm.theme.ink)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(vm.theme.surface)
+                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(vm.theme.ink, lineWidth: 1))
+                            .cornerRadius(4)
                         }
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(vm.theme.ink)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(vm.theme.surface)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(vm.theme.ink, lineWidth: 1))
-                        .cornerRadius(4)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -128,6 +171,34 @@ struct EditorView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             keyboardVisible = false
+        }
+        .overlay {
+            if showShareConfirm {
+                Color.black.opacity(0.35)
+                    .ignoresSafeArea()
+                    .onTapGesture { showShareConfirm = false }
+                ShareConfirmSheet(shareURL: $shareURL, onDismiss: { showShareConfirm = false })
+                    .environmentObject(vm)
+                    .padding(.horizontal, 20)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
+            if showAbout {
+                Color.black.opacity(0.35)
+                    .ignoresSafeArea()
+                    .onTapGesture { showAbout = false }
+                AboutSheet(onDismiss: { showAbout = false })
+                    .environmentObject(vm)
+                    .padding(.horizontal, 20)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: showShareConfirm)
+        .animation(.easeOut(duration: 0.2), value: showAbout)
+        .sheet(item: $shareURL) { url in
+            ShareSheet(url: url)
+        }
+        .sheet(item: $exportURL) { url in
+            ShareSheet(url: url)
         }
     }
 
@@ -194,5 +265,81 @@ struct EditorView: View {
         let lineRange = ns.lineRange(for: NSRange(location: tv.selectedRange.location, length: 0))
         tv.selectedRange = NSRange(location: lineRange.location, length: 0)
         tv.insertText(prefix)
+    }
+}
+
+// MARK: - About sheet
+
+struct AboutSheet: View {
+    @EnvironmentObject var vm: DeckViewModel
+    var onDismiss: () -> Void
+
+    private let features: [(String, String)] = [
+        ("Markdown",  "headings become slides, bullets reveal one by one"),
+        ("Reveal",    "animate bullets one by one during presentation"),
+        ("Cards",     "toggle card borders on/off"),
+        ("Themes",    "Stone, Midnight, Amber"),
+        ("Font size", "Small, Medium, Large"),
+        ("Timer",     "total and per-slide time in presentation mode"),
+        ("Export",    "PDF, Markdown, or share link (cloud)"),
+        ("Auto-save", "content persists locally"),
+    ]
+
+    private var version: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("demka")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(vm.theme.ink)
+                .padding(.bottom, 14)
+
+            Text("Features")
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .foregroundColor(vm.theme.mute)
+                .padding(.bottom, 8)
+
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(features, id: \.0) { key, desc in
+                    (Text(key).fontWeight(.semibold).foregroundColor(vm.theme.ink)
+                     + Text(" — ").foregroundColor(vm.theme.ink2)
+                     + Text(desc).foregroundColor(vm.theme.ink2))
+                        .font(.system(size: 13))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.bottom, 16)
+
+            VStack(alignment: .center, spacing: 3) {
+                Text("version \(version)")
+                Link("demka.in.ua", destination: URL(string: "https://demka.in.ua")!)
+                    .foregroundColor(vm.theme.active)
+                Text("created by Denys Skvortsov")
+            }
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundColor(vm.theme.mute)
+            .frame(maxWidth: .infinity)
+            .padding(.bottom, 16)
+
+            HStack {
+                Spacer()
+                Button("Got it") { onDismiss() }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(vm.theme.ink)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(vm.theme.surface)
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(vm.theme.ink, lineWidth: 1))
+                    .cornerRadius(4)
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: 360)
+        .background(vm.theme.surface)
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(vm.theme.ink, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .shadow(color: .black.opacity(0.18), radius: 24, x: 0, y: 8)
     }
 }

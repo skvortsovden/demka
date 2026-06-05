@@ -18,6 +18,15 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>demka uses the camera to scan a QR code for connecting a clicker device.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>demka uses your local network to connect nearby iPhones as a presentation clicker over Bluetooth or Wi-Fi.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_demka-cl._tcp</string>
+		<string>_demka-cl._udp</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

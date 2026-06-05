@@ -1,6 +1,35 @@
 import Foundation
 import CoreGraphics
 
+enum FontSize: String, CaseIterable, Identifiable {
+    case small, medium, large
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .small:  return "Small"
+        case .medium: return "Medium"
+        case .large:  return "Large"
+        }
+    }
+
+    var scale: CGFloat {
+        switch self {
+        case .small:  return 0.82
+        case .medium: return 1.0
+        case .large:  return 1.75
+        }
+    }
+
+    // Concrete font sizes used in CardView
+    var h1: CGFloat    { scale * 26 }
+    var h2: CGFloat    { scale * 20 }
+    var h3: CGFloat    { scale * 16 }
+    var lede: CGFloat  { scale * 13 }
+    var bullet: CGFloat      { scale * 12 }
+    var bulletNum: CGFloat   { scale * 11 }
+}
+
 enum ViewMode: String, CaseIterable, Identifiable {
     case timeline, map, logic
     var id: String { rawValue }
@@ -24,20 +53,61 @@ enum ViewMode: String, CaseIterable, Identifiable {
 
 enum LayoutEngine {
     // MARK: - Constants
-    static let cardW: CGFloat = 280
-    static let cardH: CGFloat = 180
+    static var cardW: CGFloat = 280
+    static let cardH: CGFloat = 180   // minimum / fallback height
     static let hGap: CGFloat  = 80
     static let vGap: CGFloat  = 50
+    static let maxBullets     = 10
+    // Non-zero in landscape: all cards get this fixed height instead of content-based sizing.
+    static var landscapeCardH: CGFloat = 0
+    static var fontSize: FontSize = .medium
+
+    // MARK: - Content-aware height
+    static func computeCardHeight(_ node: Node) -> CGFloat {
+        if landscapeCardH > 0 { return landscapeCardH }
+        var h: CGFloat = 14   // .padding(.top, 14) on titleText
+
+        // Estimate how many lines the title needs given available card width.
+        // charW scales with font: larger font → wider chars → fewer per line.
+        let availW = max(80, cardW - 32)   // subtract horizontal padding (16 each side)
+        let scale = fontSize.scale
+        let charW: CGFloat
+        let lineH: CGFloat
+        switch node.level {
+        case 1:  charW = 13.0 * scale; lineH = 36 * scale
+        case 2:  charW = 10.0 * scale; lineH = 28 * scale
+        default: charW =  7.5 * scale; lineH = 22 * scale
+        }
+        let charsPerLine = max(8, Int(availW / charW))
+        let titleLines   = max(1, Int(ceil(Double(node.title.count) / Double(charsPerLine))))
+        h += CGFloat(titleLines) * lineH
+        h += 10   // .padding(.bottom, 10) on titleText
+
+        let bulletCount = min(node.bullets.count, maxBullets)
+        let hasBody = !node.lede.isEmpty || bulletCount > 0
+        if hasBody {
+            if !node.lede.isEmpty {
+                h += 18 * scale
+            }
+            if bulletCount > 0 {
+                if !node.lede.isEmpty { h += 6 }
+                h += CGFloat(bulletCount) * 18 * scale
+                h += CGFloat(bulletCount - 1) * 6
+            }
+            h += 12   // .padding(.bottom, 10) + small buffer
+        }
+
+        return max(80, h)
+    }
 
     // MARK: - Timeline
-    /// Ports JS layoutTimeline exactly.
-    static func layoutTimeline(_ root: RootNode) {
+    static func layoutTimeline(_ root: RootNode, resetHeights: Bool = true) {
         let all = root.flatten()
         guard !all.isEmpty else {
             root.bounds = CGRect(x: 0, y: 0, width: 200, height: 200)
             return
         }
-        for n in all { n.w = cardW; n.h = cardH }
+        for n in all { n.w = cardW; if resetHeights { n.h = computeCardHeight(n) } }
 
         let HEADER_MID: CGFloat = (cardH * 0.18).rounded()
         let ROW_Y: CGFloat      = -HEADER_MID
@@ -52,28 +122,27 @@ enum LayoutEngine {
             for h2 in h1.children {
                 h2.x = xCur; h2.y = ROW_Y; h2.depth = 1
 
-                var yCur: CGFloat = ROW_Y + cardH + CHILD_GAP
+                var yCur: CGFloat = ROW_Y + h2.h + CHILD_GAP
                 for h3 in h2.children {
                     h3.x = xCur; h3.y = yCur; h3.depth = 2
-                    yCur += cardH + SUB_GAP
+                    yCur += h3.h + SUB_GAP
                 }
                 xCur += cardW + hGap
             }
-            xCur += hGap // extra section gap after each H1 group
+            xCur += hGap
         }
 
         applyBounds(root)
     }
 
     // MARK: - Map
-    /// Root H1 at centre, H2s split left/right, secondary H1s placed below root.
-    static func layoutMap(_ root: RootNode) {
+    static func layoutMap(_ root: RootNode, resetHeights: Bool = true) {
         let all = root.flatten()
         guard !all.isEmpty else {
             root.bounds = CGRect(x: 0, y: 0, width: 200, height: 200)
             return
         }
-        for n in all { n.w = cardW; n.h = cardH }
+        for n in all { n.w = cardW; if resetHeights { n.h = computeCardHeight(n) } }
 
         let HDIST: CGFloat = cardW * 0.4
         let MVGAP: CGFloat = vGap * 0.5
@@ -81,27 +150,29 @@ enum LayoutEngine {
 
         func placeCol(_ nodes: [Node], side: String, x: CGFloat, centerY: CGFloat, depth: Int) {
             guard !nodes.isEmpty else { return }
-            let totalH = CGFloat(nodes.count) * cardH + CGFloat(nodes.count - 1) * MVGAP
+            let totalH = nodes.reduce(CGFloat(0)) { $0 + $1.h } + CGFloat(nodes.count - 1) * MVGAP
             let startY = centerY - totalH / 2
-            for (i, n) in nodes.enumerated() {
+            var yOff: CGFloat = 0
+            for n in nodes {
                 n.x = x
-                n.y = startY + CGFloat(i) * (cardH + MVGAP)
+                n.y = startY + yOff
                 n.depth = depth
                 if !n.children.isEmpty {
                     let nx: CGFloat = side == "right"
                         ? n.x + cardW + HDIST
                         : n.x - HDIST - cardW
-                    placeCol(n.children, side: side, x: nx, centerY: n.y + cardH / 2, depth: depth + 1)
+                    placeCol(n.children, side: side, x: nx, centerY: n.y + n.h / 2, depth: depth + 1)
                 }
+                yOff += n.h + MVGAP
             }
         }
 
         let colHalf: ([Node]) -> CGFloat = { ns in
-            ns.isEmpty ? 0 : (CGFloat(ns.count) * cardH + CGFloat(ns.count - 1) * MVGAP) / 2
+            ns.isEmpty ? 0 : (ns.reduce(CGFloat(0)) { $0 + $1.h } + CGFloat(ns.count - 1) * MVGAP) / 2
         }
 
         let h1 = root.children[0]
-        h1.x = -cardW / 2; h1.y = -cardH / 2; h1.depth = 0
+        h1.x = -cardW / 2; h1.y = -h1.h / 2; h1.depth = 0
 
         let h2Kids = h1.children.filter { $0.level != 1 }
         let h1Kids = h1.children.filter { $0.level == 1 }
@@ -109,52 +180,54 @@ enum LayoutEngine {
         let rCount     = Int(ceil(Double(h2Kids.count) / 2.0))
         let rightNodes = Array(h2Kids.prefix(rCount))
         let leftNodes  = Array(h2Kids.dropFirst(rCount))
-        placeCol(rightNodes, side: "right", x: cardW / 2 + HDIST,          centerY: 0, depth: 1)
-        placeCol(leftNodes,  side: "left",  x: -cardW / 2 - HDIST - cardW, centerY: 0, depth: 1)
+        placeCol(rightNodes, side: "right", x: cardW / 2 + HDIST,           centerY: 0, depth: 1)
+        placeCol(leftNodes,  side: "left",  x: -cardW / 2 - HDIST - cardW,  centerY: 0, depth: 1)
 
         if !h1Kids.isEmpty {
-            let h2Bottom = max(cardH / 2, colHalf(rightNodes), colHalf(leftNodes))
+            let h2Bottom = max(h1.h / 2, colHalf(rightNodes), colHalf(leftNodes))
             var yKid = h2Bottom + VDIST
 
             for kid in h1Kids {
                 kid.x = -cardW / 2; kid.y = yKid; kid.depth = 1
                 let kidH2s  = kid.children
                 let kRCount = Int(ceil(Double(kidH2s.count) / 2.0))
-                let kidCY   = yKid + cardH / 2
-                placeCol(Array(kidH2s.prefix(kRCount)), side: "right", x: cardW / 2 + HDIST,          centerY: kidCY, depth: 2)
-                placeCol(Array(kidH2s.dropFirst(kRCount)), side: "left", x: -cardW / 2 - HDIST - cardW, centerY: kidCY, depth: 2)
-                let kidBottom = max(cardH / 2, colHalf(Array(kidH2s.prefix(kRCount))), colHalf(Array(kidH2s.dropFirst(kRCount))))
-                yKid += cardH / 2 + kidBottom + VDIST
+                let kidCY   = yKid + kid.h / 2
+                placeCol(Array(kidH2s.prefix(kRCount)),    side: "right", x: cardW / 2 + HDIST,          centerY: kidCY, depth: 2)
+                placeCol(Array(kidH2s.dropFirst(kRCount)), side: "left",  x: -cardW / 2 - HDIST - cardW, centerY: kidCY, depth: 2)
+                let kidBottom = max(kid.h / 2,
+                                   colHalf(Array(kidH2s.prefix(kRCount))),
+                                   colHalf(Array(kidH2s.dropFirst(kRCount))))
+                yKid += kid.h / 2 + kidBottom + VDIST
             }
         }
 
+        resolveOverlaps(all, gap: MVGAP)
         applyBounds(root)
     }
 
     // MARK: - Logic
-    /// Secondary H1s stack vertically below root instead of branching right.
-    static func layoutLogic(_ root: RootNode) {
+    static func layoutLogic(_ root: RootNode, resetHeights: Bool = true) {
         let all = root.flatten()
         guard !all.isEmpty else {
             root.bounds = CGRect(x: 0, y: 0, width: 200, height: 200)
             return
         }
-        for n in all { n.w = cardW; n.h = cardH }
+        for n in all { n.w = cardW; if resetHeights { n.h = computeCardHeight(n) } }
 
         let HDIST: CGFloat = cardW * 0.9
         let VDIST: CGFloat = vGap * 4
 
         func subH(_ n: Node) -> CGFloat {
             let kids = n.children.filter { $0.level != 1 }
-            if kids.isEmpty { return cardH }
+            if kids.isEmpty { return n.h }
             let total = kids.reduce(CGFloat(0)) { $0 + subH($1) } + vGap * CGFloat(kids.count - 1)
-            return max(cardH, total)
+            return max(n.h, total)
         }
 
         func place(_ n: Node, x: CGFloat, centerY: CGFloat, depth: Int) {
             n.depth = depth
             n.x = x
-            n.y = centerY - cardH / 2
+            n.y = centerY - n.h / 2
             let kids = n.children.filter { $0.level != 1 }
             guard !kids.isEmpty else { return }
             let totalH = kids.reduce(CGFloat(0)) { $0 + subH($1) } + vGap * CGFloat(kids.count - 1)
@@ -180,7 +253,33 @@ enum LayoutEngine {
             yOff += kidSh + VDIST
         }
 
+        resolveOverlaps(all, gap: vGap * 0.5)
         applyBounds(root)
+    }
+
+    // MARK: - Overlap resolution
+    // Groups nodes by column (same x), sorts by y, then repeatedly pushes
+    // any card that overlaps the one above it downward until every pair in
+    // the column has at least `gap` points of vertical space.
+    static func resolveOverlaps(_ all: [Node], gap: CGFloat) {
+        var byX: [Int: [Node]] = [:]
+        for n in all {
+            byX[Int(n.x.rounded()), default: []].append(n)
+        }
+        for (_, col) in byX where col.count > 1 {
+            let sorted = col.sorted { $0.y < $1.y }
+            var changed = true
+            while changed {
+                changed = false
+                for i in 1..<sorted.count {
+                    let needed = sorted[i - 1].y + sorted[i - 1].h + gap
+                    if sorted[i].y < needed {
+                        sorted[i].y = needed
+                        changed = true
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - applyBounds
@@ -209,7 +308,6 @@ enum LayoutEngine {
     }
 
     // MARK: - promoteFirstAsRoot
-    /// If map or logic and multiple H1s, make first H1 the parent of all others.
     static func promoteFirstAsRoot(_ root: RootNode) {
         guard root.children.count > 1 else { return }
         let first = root.children[0]
