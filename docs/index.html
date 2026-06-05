@@ -849,8 +849,8 @@
   <div class="phone-code-screen" id="phone-code-screen" style="display:none">
     <div class="phone-code-label">Enter session code</div>
     <input class="phone-code-input" id="phone-code-input" maxlength="6"
-      autocapitalize="characters" autocomplete="off" autocorrect="off"
-      spellcheck="false" inputmode="text" placeholder="ABCDEF">
+      autocomplete="off" autocorrect="off"
+      spellcheck="false" inputmode="numeric" pattern="[0-9]*" placeholder="000000">
     <button class="phone-code-btn" id="phone-code-btn">Connect</button>
     <div class="phone-code-err" id="phone-code-err"></div>
   </div>
@@ -1077,8 +1077,7 @@ const STRINGS = {
     remoteTitle: 'Clicker',
     remoteWaiting: 'Waiting for phone…',
     remoteConnected: 'Phone connected',
-    remoteDisconnected: 'Disconnected — rescan to reconnect',
-    remotePeerFail: 'Failed to load PeerJS',
+    remoteDisconnected: 'Disconnected',
     remoteNotAvail: 'Not available on file://',
     remoteFileMsg: 'Remote requires<br>HTTP/HTTPS.<br>Open via demka.in.ua',
     remoteClose: 'Close',
@@ -1176,8 +1175,7 @@ const STRINGS = {
     remoteTitle: 'Клікер',
     remoteWaiting: 'Очікування зʼєднання з телефоном…',
     remoteConnected: 'Телефон підключено',
-    remoteDisconnected: 'Відключено — відскануйте код знову',
-    remotePeerFail: 'Помилка завантаження PeerJS',
+    remoteDisconnected: 'Відключено',
     remoteNotAvail: 'Недоступно на file://',
     remoteFileMsg: 'Потрібен<br>HTTP/HTTPS.<br>Відкрийте через demka.in.ua',
     remoteClose: 'Закрити',
@@ -2120,7 +2118,7 @@ function updateNavButtons(){
 }
 
 // ── Persistence ──────────────────────────────────────────────
-const APP_VERSION = '2.17.1';
+const APP_VERSION = '2.18.0';
 const STORAGE_KEY = 'demka.md';
 const IMG_KEY_PREFIX = 'demka.img.';
 
@@ -2443,60 +2441,68 @@ document.addEventListener('fullscreenchange', ()=>{
   }
 });
 
-// ── Remote control ───────────────────────────────────────────
-let remotePeer = null;
-let remoteConn = null;
+// ── Remote control (WebRTC + Firestore signalling, no PeerJS) ──
+const FS_BASE = 'https://firestore.googleapis.com/v1/projects/demka-944f1/databases/(default)/documents';
+const FS_KEY  = 'AIzaSyBMQMTFQwWaqDcId-knFXw0Fh5VQCqQo3k';
+const ICE_CFG = { iceServers: [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' }
+]};
 
-function loadPeerJS(cb){
-  if (window.Peer){ cb(); return; }
-  const s = document.createElement('script');
-  s.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
-  s.onload = cb;
-  s.onerror = () => { remoteStatusKey = 'remotePeerFail'; $('#remote-status-text').textContent = STRINGS[lang].remotePeerFail; };
-  document.head.appendChild(s);
+async function fsWrite(code, fields){
+  const body = { fields: Object.fromEntries(
+    Object.entries(fields).map(([k,v]) => [k, { stringValue: String(v) }])
+  )};
+  await fetch(`${FS_BASE}/clicker-sessions/${code}?key=${FS_KEY}`, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+}
+async function fsRead(code){
+  const r = await fetch(`${FS_BASE}/clicker-sessions/${code}?key=${FS_KEY}`);
+  if (!r.ok) return null;
+  const doc = await r.json();
+  if (!doc.fields) return null;
+  return Object.fromEntries(Object.entries(doc.fields).map(([k,v]) => [k, v.stringValue || '']));
+}
+async function fsDelete(code){
+  await fetch(`${FS_BASE}/clicker-sessions/${code}?key=${FS_KEY}`, { method: 'DELETE' }).catch(()=>{});
 }
 
-function remoteUID(){
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/I/1/L
-  let id = '';
-  for (let i = 0; i < 6; i++) id += chars[Math.floor(Math.random() * chars.length)];
-  return id;
+async function gatherIce(pc){
+  if (pc.iceGatheringState === 'complete') return;
+  await new Promise(resolve => {
+    const t = setTimeout(resolve, 8000);
+    pc.onicegatheringstatechange = () => {
+      if (pc.iceGatheringState === 'complete'){ clearTimeout(t); resolve(); }
+    };
+  });
 }
+
+function remoteUID(){ return String(100000 + Math.floor(Math.random() * 900000)); }
+
+let remoteConn = null; // RTCDataChannel on presenter side
 
 function remoteSendSlide(){
-  if (!remoteConn?.open) return;
+  if (!remoteConn || remoteConn.readyState !== 'open') return;
   const node = state.nodes[state.activeIdx];
   const tot = node ? totalRevealSteps(node) : 0;
   remoteConn.send(JSON.stringify({
-    type: 'slide',
-    title: node?.text || '',
-    notes: node?.notes || '',
-    index: state.activeIdx + 1,
-    total: state.nodes.length,
-    bulletsShown: state.bulletsShown,
-    bulletsTotal: tot
+    type:'slide', title:node?.text||'', notes:node?.notes||'',
+    index:state.activeIdx+1, total:state.nodes.length,
+    bulletsShown:state.bulletsShown, bulletsTotal:tot
   }));
 }
-
 function remoteSendTimer(){
-  if (!remoteConn?.open) return;
+  if (!remoteConn || remoteConn.readyState !== 'open') return;
   remoteConn.send(JSON.stringify({
-    type: 'timer',
-    enabled: timerCheck.checked,
-    total: _timerTotal,
-    slide: _timerSlide
+    type:'timer', enabled:timerCheck.checked, total:_timerTotal, slide:_timerSlide
   }));
 }
-
 function remoteSendSettings(){
-  if (!remoteConn?.open) return;
+  if (!remoteConn || remoteConn.readyState !== 'open') return;
   remoteConn.send(JSON.stringify({
-    type: 'settings',
-    reveal: state.revealEnabled,
-    zoom: state.zoomEnabled,
-    cards: cardsCheck.checked,
-    timer: timerCheck.checked,
-    presenting: state.present
+    type:'settings', reveal:state.revealEnabled, zoom:state.zoomEnabled,
+    cards:cardsCheck.checked, timer:timerCheck.checked, presenting:state.present
   }));
 }
 
@@ -2510,23 +2516,31 @@ document.addEventListener('fullscreenchange', () => {
 });
 
 function handleRemoteCommand(d){
-  if (d === 'next')          { advance(); }
-  else if (d === 'prev')     { back(); }
-  else if (d === 'toggleReveal'){ revealCheck.checked = !revealCheck.checked; revealCheck.dispatchEvent(new Event('change')); }
-  else if (d === 'toggleZoom')  { zoomCheck.checked   = !zoomCheck.checked;   zoomCheck.dispatchEvent(new Event('change')); }
-  else if (d === 'toggleCards') { cardsCheck.checked  = !cardsCheck.checked;  cardsCheck.dispatchEvent(new Event('change')); }
-  else if (d === 'toggleTimer') { timerCheck.checked  = !timerCheck.checked;  timerCheck.dispatchEvent(new Event('change')); }
-  else if (d === 'present'){
-    if (!state.present){ togglePresent(); }
-    if (!document.fullscreenElement) fsPrompt.style.display = 'flex';
-  }
-  else if (d === 'stopPresent'){
-    if (state.present){ togglePresent(); }
-    fsPrompt.style.display = 'none';
-  }
+  if (d === 'next')              { advance(); }
+  else if (d === 'prev')         { back(); }
+  else if (d === 'toggleReveal') { revealCheck.checked = !revealCheck.checked; revealCheck.dispatchEvent(new Event('change')); }
+  else if (d === 'toggleZoom')   { zoomCheck.checked   = !zoomCheck.checked;   zoomCheck.dispatchEvent(new Event('change')); }
+  else if (d === 'toggleCards')  { cardsCheck.checked  = !cardsCheck.checked;  cardsCheck.dispatchEvent(new Event('change')); }
+  else if (d === 'toggleTimer')  { timerCheck.checked  = !timerCheck.checked;  timerCheck.dispatchEvent(new Event('change')); }
+  else if (d === 'present')      { if (!state.present) togglePresent(); if (!document.fullscreenElement) fsPrompt.style.display = 'flex'; }
+  else if (d === 'stopPresent')  { if (state.present)  togglePresent(); fsPrompt.style.display = 'none'; }
 }
 
-function openRemoteModal(){
+let _hostPC = null, _hostPollTimer = null;
+
+function remoteMarkConnected(){
+  $('#remote-dot').classList.add('on');
+  remoteStatusKey = 'remoteConnected';
+  $('#remote-status-text').textContent = STRINGS[lang].remoteConnected;
+}
+function remoteMarkDisconnected(){
+  remoteConn = null;
+  $('#remote-dot').classList.remove('on');
+  remoteStatusKey = 'remoteDisconnected';
+  $('#remote-status-text').textContent = STRINGS[lang].remoteDisconnected;
+}
+
+async function openRemoteModal(){
   $('#remote-modal').classList.add('show');
   if (location.protocol === 'file:'){
     $('#remote-qr').innerHTML = `<span style="color:var(--mute);font-size:12px;font-family:var(--mono);line-height:1.5;text-align:center;display:block">${STRINGS[lang].remoteFileMsg}</span>`;
@@ -2534,50 +2548,45 @@ function openRemoteModal(){
     $('#remote-status-text').textContent = STRINGS[lang].remoteNotAvail;
     return;
   }
-  if (remotePeer) return;
-  loadPeerJS(() => {
-    const id = remoteUID();
-    remotePeer = new Peer(id);
-    remotePeer.on('open', () => {
-      const url = location.origin + location.pathname + '?remote=' + id;
-      $('#remote-qr').innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=160x160&margin=4" alt="QR">`;
-      $('#remote-code').textContent = id;
-    });
-    remotePeer.on('connection', conn => {
-      remoteConn = conn;
-      let staleTimer = null;
-      function resetStale(){
-        clearTimeout(staleTimer);
-        staleTimer = setTimeout(() => {
-          remoteConn = null;
-          $('#remote-dot').classList.remove('on');
-          remoteStatusKey = 'remoteDisconnected';
-          $('#remote-status-text').textContent = STRINGS[lang].remoteDisconnected;
-        }, 12000);
-      }
-      $('#remote-dot').classList.add('on');
-      remoteStatusKey = 'remoteConnected';
-      $('#remote-status-text').textContent = STRINGS[lang].remoteConnected;
-      conn.on('open', () => {
-        resetStale();
-        remoteSendSlide();
-        remoteSendTimer();
-        remoteSendSettings();
-      });
-      conn.on('data', d => {
-        resetStale();
-        if (d !== 'ping') handleRemoteCommand(d);
-      });
-      conn.on('close', () => {
-        clearTimeout(staleTimer);
-        remoteConn = null;
-        $('#remote-dot').classList.remove('on');
-        remoteStatusKey = 'remoteDisconnected';
-        $('#remote-status-text').textContent = STRINGS[lang].remoteDisconnected;
-      });
-    });
-    remotePeer.on('error', err => { $('#remote-status-text').textContent = 'Error: ' + err.type; });
-  });
+  if (_hostPC) return; // already running
+
+  const code = remoteUID();
+  const pc = new RTCPeerConnection(ICE_CFG);
+  _hostPC = pc;
+  const ch = pc.createDataChannel('clicker', { ordered: true });
+
+  ch.onopen = () => {
+    remoteConn = ch;
+    remoteMarkConnected();
+    remoteSendSlide(); remoteSendTimer(); remoteSendSettings();
+  };
+  ch.onmessage = e => { if (e.data !== 'ping') handleRemoteCommand(e.data); };
+  ch.onclose = () => remoteMarkDisconnected();
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') remoteMarkDisconnected();
+  };
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await gatherIce(pc);
+
+  await fsWrite(code, { offer: pc.localDescription.sdp });
+
+  const url = location.origin + location.pathname + '?clicker=' + code;
+  $('#remote-qr').innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=160x160&margin=4" alt="QR">`;
+  $('#remote-code').textContent = code;
+
+  // Poll for answer
+  _hostPollTimer = setInterval(async () => {
+    const doc = await fsRead(code);
+    if (!doc?.answer) return;
+    clearInterval(_hostPollTimer); _hostPollTimer = null;
+    await pc.setRemoteDescription({ type: 'answer', sdp: doc.answer });
+    fsDelete(code);
+  }, 2000);
+
+  // Expire session after 10 min
+  setTimeout(() => { clearInterval(_hostPollTimer); fsDelete(code); }, 600000);
 }
 
 function closeRemoteModal(){
@@ -2587,62 +2596,26 @@ function closeRemoteModal(){
 $('#remote-btn').addEventListener('click', openRemoteModal);
 $('#remote-close').addEventListener('click', closeRemoteModal);
 $('#remote-modal').addEventListener('click', e => { if (e.target===$('#remote-modal')) closeRemoteModal(); });
-window.addEventListener('beforeunload', () => { if (remotePeer) remotePeer.destroy(); });
+window.addEventListener('beforeunload', () => { clearInterval(_hostPollTimer); if (_hostPC) _hostPC.close(); });
 
 (function checkPhoneMode(){
-  const params = new URLSearchParams(location.search);
-  const hostId = params.get('remote');
-  const clickerMode = params.has('clicker');
-  if (!hostId && !clickerMode) return;
+  const params   = new URLSearchParams(location.search);
+  const autoCode = params.get('clicker'); // ?clicker=123456 → auto-join
+  const manMode  = params.has('clicker') && !autoCode; // ?clicker (no value) → show entry
+  if (!autoCode && !manMode) return;
 
   document.body.classList.add('phone-mode');
 
-  let currentConn = null;
-  function sendCmd(cmd){ if (currentConn?.open) currentConn.send(cmd); }
+  let currentChannel = null;
+  function sendCmd(cmd){ if (currentChannel?.readyState === 'open') currentChannel.send(cmd); }
 
-  // ── Code entry screen (for ?clicker mode) ──────────────────
-  if (clickerMode && !hostId) {
-    $('#phone-code-screen').style.display = 'flex';
-    $('#phone-clicker-ui').style.display = 'none';
-
-    const input = $('#phone-code-input');
-    const btn   = $('#phone-code-btn');
-    const err   = $('#phone-code-err');
-
-    function submitCode(){
-      const code = input.value.toUpperCase().replace(/[^A-Z2-9]/g, '');
-      if (code.length < 6){ err.textContent = 'Enter 6 characters'; return; }
-      err.textContent = '';
-      // Transition to clicker UI and connect
-      $('#phone-code-screen').style.display = 'none';
-      $('#phone-clicker-ui').style.display = 'contents';
-      $('#phone-status-text').textContent = STRINGS[lang].phoneConnecting;
-      startClicker(code);
-    }
-    btn.addEventListener('click', submitCode);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') submitCode(); });
-    // Auto-format: uppercase only valid chars
-    input.addEventListener('input', () => {
-      const v = input.value.toUpperCase().replace(/[^ABCDEFGHJKLMNPQRSTUVWXYZ23456789]/g, '');
-      input.value = v;
-    });
-    return; // don't auto-connect yet
-  }
-
-  // ── Direct connect via ?remote=CODE ─────────────────────────
-  $('#phone-status-text').textContent = STRINGS[lang].phoneConnecting;
-  startClicker(hostId);
-
-  function startClicker(code){
-
-  // Toggle buttons
+  // Wire buttons (safe to do early — sendCmd guards readyState)
   $('#pt-reveal').addEventListener('click', () => sendCmd('toggleReveal'));
   $('#pt-zoom').addEventListener('click',   () => sendCmd('toggleZoom'));
   $('#pt-cards').addEventListener('click',  () => sendCmd('toggleCards'));
   $('#pt-timer').addEventListener('click',  () => sendCmd('toggleTimer'));
   $('#phone-next').addEventListener('click', () => sendCmd('next'));
   $('#phone-prev').addEventListener('click', () => sendCmd('prev'));
-
   const presentBtn = $('#phone-present-btn');
   let isPresenting = false;
   presentBtn.addEventListener('click', () => sendCmd(isPresenting ? 'stopPresent' : 'present'));
@@ -2650,27 +2623,22 @@ window.addEventListener('beforeunload', () => { if (remotePeer) remotePeer.destr
   function updateSlide(msg){
     $('#phone-slide-title').textContent = msg.title || '';
     const notes = msg.notes || '';
-    $('#phone-slide-notes').textContent = notes.length > 280 ? notes.slice(0, 280) + '…' : notes;
-    const infoRow = $('#phone-info-row');
-    const counterEl = $('#pt-counter');
+    $('#phone-slide-notes').textContent = notes.length > 280 ? notes.slice(0,280)+'…' : notes;
     if (msg.total > 0){
-      infoRow.style.display = '';
+      $('#phone-info-row').style.display = '';
       let html = `${msg.index}/${msg.total}`;
       if (msg.bulletsTotal > 0) html += `<br>${msg.bulletsShown}/${msg.bulletsTotal}`;
-      counterEl.innerHTML = html;
+      $('#pt-counter').innerHTML = html;
     }
   }
-
   function updateTimer(msg){
-    const timerBlock = $('#pt-timer-block');
-    timerBlock.style.display = msg.enabled ? '' : 'none';
+    $('#pt-timer-block').style.display = msg.enabled ? '' : 'none';
     if (msg.enabled){
       $('#phone-info-row').style.display = '';
       $('#pt-total').textContent = fmtTime(msg.total);
       $('#pt-slide').textContent = fmtTime(msg.slide);
     }
   }
-
   function updateSettings(msg){
     $('#pt-reveal').classList.toggle('on', msg.reveal);
     $('#pt-zoom').classList.toggle('on', msg.zoom);
@@ -2681,92 +2649,86 @@ window.addEventListener('beforeunload', () => { if (remotePeer) remotePeer.destr
     presentBtn.textContent = msg.presenting ? '⏹ Stop' : '▶ Present';
   }
 
-  loadPeerJS(() => {
-    let peer = null;
-    let poll = null, retryTimer = null, pingInterval = null;
+  function setStatus(t){ $('#phone-status-text').textContent = t; }
+  function markConnected(){
+    $('#phone-dot').classList.add('on');
+    phoneStatusKey = 'phoneConnected';
+    setStatus(STRINGS[lang].phoneConnected);
+    $('#phone-retry').classList.remove('show');
+    // send ping every 5s to keep channel alive
+    setInterval(() => { if (currentChannel?.readyState === 'open') currentChannel.send('ping'); }, 5000);
+  }
+  function markDisconnected(){
+    currentChannel = null;
+    $('#phone-dot').classList.remove('on');
+    phoneStatusKey = 'phoneDisconnected';
+    setStatus(STRINGS[lang].phoneDisconnected);
+    $('#phone-retry').classList.add('show');
+  }
 
-    function setStatus(text){ $('#phone-status-text').textContent = text; }
+  async function joinWithCode(code){
+    setStatus(STRINGS[lang].phoneConnecting);
+    $('#phone-retry').classList.remove('show');
+    try {
+      const doc = await fsRead(code);
+      if (!doc?.offer){ setStatus('Code not found'); $('#phone-retry').classList.add('show'); return; }
 
-    function markDisconnected(){
-      currentConn = null;
-      clearInterval(pingInterval);
-      clearTimeout(retryTimer);
-      clearInterval(poll);
-      $('#phone-dot').classList.remove('on');
-      phoneStatusKey = 'phoneDisconnected';
-      setStatus(STRINGS[lang].phoneDisconnected);
+      const pc = new RTCPeerConnection(ICE_CFG);
+      pc.ondatachannel = e => {
+        const ch = e.channel;
+        ch.onopen = () => { currentChannel = ch; markConnected(); };
+        ch.onmessage = ev => {
+          if (ev.data === 'ping') return;
+          let msg; try { msg = JSON.parse(ev.data); } catch(e){ return; }
+          if (msg.type === 'slide')         updateSlide(msg);
+          else if (msg.type === 'timer')    updateTimer(msg);
+          else if (msg.type === 'settings') updateSettings(msg);
+        };
+        ch.onclose = () => markDisconnected();
+      };
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') markDisconnected();
+      };
+
+      await pc.setRemoteDescription({ type: 'offer', sdp: doc.offer });
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      await gatherIce(pc);
+      await fsWrite(code, { offer: doc.offer, answer: pc.localDescription.sdp });
+    } catch(e){
+      setStatus('Error: ' + e.message);
       $('#phone-retry').classList.add('show');
     }
+  }
 
-    function attemptConnect(){
-      if (currentConn){ try{ currentConn.close(); }catch(e){} currentConn = null; }
-      clearInterval(poll); clearTimeout(retryTimer); clearInterval(pingInterval);
-      $('#phone-retry').classList.remove('show');
-      $('#phone-dot').classList.remove('on');
-      phoneStatusKey = 'phoneConnecting';
-      setStatus(STRINGS[lang].phoneConnecting);
+  // ── Auto-join from QR (?clicker=123456) ──────────────────────
+  if (autoCode){
+    $('#phone-code-screen').style.display = 'none';
+    joinWithCode(autoCode);
+    $('#phone-retry').addEventListener('click', () => joinWithCode(autoCode));
+    return;
+  }
 
-      if (!peer || peer.destroyed){ createPeer(); return; }
+  // ── Manual code entry (?clicker with no value) ────────────────
+  $('#phone-code-screen').style.display = 'flex';
+  $('#phone-clicker-ui').style.display = 'none';
 
-      const conn = peer.connect(code);
-      currentConn = conn;
-      let marked = false;
+  const input = $('#phone-code-input');
+  const btn   = $('#phone-code-btn');
+  const err   = $('#phone-code-err');
 
-      function markConnected(){
-        if (marked) return;
-        marked = true;
-        clearTimeout(retryTimer);
-        clearInterval(poll);
-        $('#phone-retry').classList.remove('show');
-        $('#phone-dot').classList.add('on');
-        phoneStatusKey = 'phoneConnected';
-        setStatus(STRINGS[lang].phoneConnected);
-        pingInterval = setInterval(() => { if (conn.open) conn.send('ping'); else markDisconnected(); }, 5000);
-      }
-
-      conn.on('open', markConnected);
-      conn.on('data', d => {
-        if (d === 'connected'){ markConnected(); return; }
-        let msg;
-        try { msg = JSON.parse(d); } catch(e) { return; }
-        if (msg.type === 'slide')         updateSlide(msg);
-        else if (msg.type === 'timer')    updateTimer(msg);
-        else if (msg.type === 'settings') updateSettings(msg);
-      });
-      poll = setInterval(() => { if (conn.open){ markConnected(); clearInterval(poll); } }, 200);
-      setTimeout(() => clearInterval(poll), 30000);
-
-      retryTimer = setTimeout(() => { if (!marked) $('#phone-retry').classList.add('show'); }, 15000);
-
-      conn.on('close', () => { marked = false; markDisconnected(); });
-    }
-
-    function createPeer(){
-      if (peer && !peer.destroyed){ try{ peer.destroy(); }catch(e){} }
-      setStatus('Reconnecting…');
-      peer = new Peer();
-      peer.on('open', () => attemptConnect());
-      peer.on('disconnected', () => {
-        setStatus('Reconnecting…');
-        setTimeout(() => {
-          if (peer.destroyed) createPeer();
-          else try { peer.reconnect(); } catch(e){ createPeer(); }
-        }, 2000);
-      });
-      peer.on('error', err => {
-        if (err.type === 'network' || err.type === 'disconnected' || err.type === 'server-error'){
-          setTimeout(createPeer, 3000);
-        } else {
-          setStatus('Error: ' + err.type);
-          $('#phone-retry').classList.add('show');
-        }
-      });
-    }
-
-    createPeer();
-    $('#phone-retry').addEventListener('click', attemptConnect);
-  });
-  } // end startClicker
+  function submitCode(){
+    const code = input.value.replace(/\D/g, '');
+    if (code.length < 6){ err.textContent = 'Enter 6 digits'; return; }
+    err.textContent = '';
+    $('#phone-code-screen').style.display = 'none';
+    $('#phone-clicker-ui').style.display = 'contents';
+    joinWithCode(code);
+    $('#phone-retry').addEventListener('click', () => joinWithCode(code));
+  }
+  btn.addEventListener('click', submitCode);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submitCode(); });
+  input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, '').slice(0,6); });
 })();
 
 // ── iOS clicker phone mode ────────────────────────────────────

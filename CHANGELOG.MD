@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.18.0] - 2026-06-05
+
+### Changed
+- Web clicker: replaced PeerJS with manual WebRTC + Firestore signalling (no third-party cloud relay)
+- Web clicker: session codes are now 6-digit numeric only (e.g. `483920`), no letters
+- Web clicker: QR code encodes `?clicker=<code>` for direct auto-connect; manual entry at `?clicker` accepts digits only
+- Web clicker: Firestore stores only the SDP offer/answer during handshake and is cleaned up immediately after connection
+
+---
+
 ## [2.17.1] - 2026-06-05
 
 ### Fixed
