@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.17.0] - 2026-06-05
+
+### Added
+- Web clicker: full rich clicker UI for `?remote=<id>` (WebRTC/PeerJS) — slide title, speaker notes, timer (total/slide), slide/bullet counter, reveal/zoom/cards/timer toggles, Present/Stop button
+- Speaker notes parsing in web markdown parser: `---text---` (single-line) and `---\ntext\n---` (multi-line) blocks, matching iOS syntax
+- iOS clicker: QR scan button in Clicker popup opens in-app camera scanner (VisionKit `DataScannerViewController`) to connect without leaving the app
+- iOS clicker: phone icon on View screen turns green when acting as connected clicker remote
+- iOS clicker: "Disconnected" status when connection drops from presenter side; tapping phone icon after disconnect opens Clicker popup for a fresh session
+
+### Changed
+- Renamed `docs/` folder to `web/`
+- iOS clicker landscape layout: nav buttons moved to bottom-left / bottom-right corners; notes area fills the space between
+- iOS clicker: returning to View screen via ← View always lands on deck view (not editor)
+
+---
+
 ## [2.16.0] - 2026-06-05
 
 ### Added

@@ -386,29 +386,52 @@
   .remote-dot.on{background:#5a9e6f}
   .remote-card .close{display:flex;justify-content:flex-end}
 
-  /* ── Phone remote UI ─────────────────────────────────────────── */
+  /* ── Phone remote UI (clicker) ───────────────────────────────── */
   .phone-ui{display:none;position:fixed;inset:0;flex-direction:column;
-    background:var(--bg);z-index:300}
+    background:#0e0e0e;z-index:300;color:#fff}
   body.phone-mode .phone-ui{display:flex}
-  .phone-status{font-family:var(--mono);font-size:11px;color:var(--mute);
-    letter-spacing:.08em;text-transform:uppercase;display:flex;align-items:center;
-    justify-content:center;gap:8px;padding:20px 0 0;flex-shrink:0}
-  .phone-dot{width:6px;height:6px;border-radius:50%;background:var(--mute);
-    transition:background 200ms var(--ease)}
+  .phone-toolbar{display:flex;align-items:center;gap:10px;
+    padding:12px 16px 10px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.08)}
+  .phone-status-bar{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+  .phone-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.25);
+    flex-shrink:0;transition:background 200ms}
   .phone-dot.on{background:#5a9e6f}
-  .phone-retry{display:none;appearance:none;border:1px solid var(--line);background:transparent;
-    color:var(--mute);font:600 11px/1 var(--font);letter-spacing:.06em;text-transform:uppercase;
-    padding:6px 12px;border-radius:3px;cursor:pointer;-webkit-tap-highlight-color:transparent;
-    transition:border-color 120ms var(--ease),color 120ms var(--ease)}
+  .phone-status-text{font:600 11px/1 var(--mono);letter-spacing:.05em;text-transform:uppercase;
+    color:rgba(255,255,255,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .phone-retry{display:none;appearance:none;border:1px solid rgba(255,255,255,.2);
+    background:transparent;color:rgba(255,255,255,.4);font:600 11px/1 var(--font);
+    letter-spacing:.05em;text-transform:uppercase;padding:5px 10px;border-radius:3px;
+    cursor:pointer;-webkit-tap-highlight-color:transparent;flex-shrink:0}
   .phone-retry.show{display:inline-block}
-  .phone-retry:active{border-color:var(--ink2);color:var(--ink)}
-  .phone-btns{display:flex;flex:1}
-  .phone-btn{flex:1;border:none;background:transparent;color:var(--ink2);
-    font-size:40px;cursor:pointer;display:flex;align-items:center;justify-content:center;
-    -webkit-tap-highlight-color:transparent;touch-action:manipulation;
-    transition:background 80ms var(--ease),color 80ms var(--ease)}
-  .phone-btn+.phone-btn{border-left:1px solid var(--line)}
-  .phone-btn:active{background:var(--surface);color:var(--ink)}
+  .phone-toggles{display:flex;gap:18px;flex-shrink:0}
+  .phone-toggle{appearance:none;border:none;background:transparent;cursor:pointer;
+    padding:2px;font-size:15px;color:rgba(255,255,255,.22);
+    -webkit-tap-highlight-color:transparent;transition:color 120ms}
+  .phone-toggle.on{color:#fff}
+  .phone-present-btn{appearance:none;flex-shrink:0;
+    border:1px solid rgba(255,255,255,.25);background:transparent;
+    color:rgba(255,255,255,.8);font:600 12px/1 var(--font);
+    padding:7px 13px;border-radius:4px;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;white-space:nowrap;transition:background 120ms,color 120ms}
+  .phone-present-btn.presenting{background:#fff;color:#000;border-color:#fff}
+  .phone-info-row{display:flex;align-items:flex-start;justify-content:space-between;
+    padding:8px 16px 4px;flex-shrink:0}
+  .phone-timer-block{display:flex;flex-direction:column;gap:2px}
+  .phone-timer-line{font:600 11px/1.4 var(--mono)}
+  .phone-timer-label{color:rgba(255,255,255,.3);margin-right:4px}
+  .phone-timer-val{color:rgba(255,255,255,.55)}
+  .phone-counter-block{font:600 11px/1.4 var(--mono);text-align:right;
+    color:rgba(255,255,255,.4)}
+  .phone-notes{flex:1;overflow-y:auto;padding:16px 24px 8px}
+  .phone-slide-title{font:700 20px/1.3 var(--font);color:#fff;margin-bottom:10px}
+  .phone-slide-notes{font-size:15px;line-height:1.55;color:rgba(255,255,255,.65)}
+  .phone-btns{display:flex;flex-shrink:0;border-top:1px solid rgba(255,255,255,.08)}
+  .phone-btn{flex:1;border:none;background:transparent;color:rgba(255,255,255,.35);
+    font-size:36px;height:110px;cursor:pointer;display:flex;align-items:center;
+    justify-content:center;-webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;transition:background 80ms,color 80ms}
+  .phone-btn+.phone-btn{border-left:1px solid rgba(255,255,255,.08)}
+  .phone-btn:active{background:rgba(255,255,255,.08);color:#fff}
 
   /* ── No-cards mode ───────────────────────────────────────────── */
   body.no-cards .node{background:transparent!important;border-color:transparent!important;box-shadow:none!important}
@@ -793,10 +816,30 @@
 </div>
 
 <div class="phone-ui" id="phone-ui">
-  <div class="phone-status">
-    <span class="phone-dot" id="phone-dot"></span>
-    <span id="phone-status-text">Connecting…</span>
-    <button class="phone-retry" id="phone-retry">↺ Retry</button>
+  <div class="phone-toolbar">
+    <div class="phone-status-bar">
+      <span class="phone-dot" id="phone-dot"></span>
+      <span class="phone-status-text" id="phone-status-text">Connecting…</span>
+      <button class="phone-retry" id="phone-retry">↺ Retry</button>
+    </div>
+    <div class="phone-toggles">
+      <button class="phone-toggle" id="pt-reveal" title="Reveal">✦</button>
+      <button class="phone-toggle" id="pt-zoom" title="Zoom">⊕</button>
+      <button class="phone-toggle" id="pt-cards" title="Cards">⧉</button>
+      <button class="phone-toggle" id="pt-timer" title="Timer">⏱</button>
+    </div>
+    <button class="phone-present-btn" id="phone-present-btn">▶ Present</button>
+  </div>
+  <div class="phone-info-row" id="phone-info-row" style="display:none">
+    <div class="phone-timer-block" id="pt-timer-block" style="display:none">
+      <div class="phone-timer-line"><span class="phone-timer-label">total</span><span class="phone-timer-val" id="pt-total">00:00:00</span></div>
+      <div class="phone-timer-line"><span class="phone-timer-label">slide</span><span class="phone-timer-val" id="pt-slide">00:00:00</span></div>
+    </div>
+    <div class="phone-counter-block" id="pt-counter"></div>
+  </div>
+  <div class="phone-notes">
+    <div class="phone-slide-title" id="phone-slide-title"></div>
+    <div class="phone-slide-notes" id="phone-slide-notes"></div>
   </div>
   <div class="phone-btns">
     <button class="phone-btn" id="phone-prev">&#8592;</button>
@@ -1258,7 +1301,7 @@ function parseMarkdown(src){
   let stack = [root];
 
   function makeNode(level, text){
-    return { type:'h'+level, level, text, lede:'', bullets:[], code:null, images:[], children:[], id: uid() };
+    return { type:'h'+level, level, text, lede:'', bullets:[], notes:'', code:null, images:[], children:[], id: uid() };
   }
   function topOfDepth(d){
     while (stack.length > 1 && stack[stack.length-1].level >= d) stack.pop();
@@ -1266,6 +1309,7 @@ function parseMarkdown(src){
   }
 
   let inCode = false, codeBuf = [];
+  let inNotes = false, noteBuf = [];
   let currentBulletPath = [];
 
   for (const raw of lines){
@@ -1278,6 +1322,27 @@ function parseMarkdown(src){
       continue;
     }
     if (inCode){ codeBuf.push(raw); continue; }
+
+    const trimmed = raw.trim();
+
+    // Notes block accumulation
+    if (inNotes){
+      if (trimmed === '---'){
+        const cur = stack[stack.length-1];
+        if (cur && cur !== root) cur.notes = noteBuf.join('\n').trim();
+        noteBuf = []; inNotes = false;
+      } else { noteBuf.push(trimmed); }
+      continue;
+    }
+    // Single-line notes: ---text---
+    if (/^---(.+)---$/.test(trimmed)){
+      const inner = trimmed.slice(3, -3).trim();
+      const cur = stack[stack.length-1];
+      if (inner && cur && cur !== root) cur.notes = inner;
+      continue;
+    }
+    // Start of multi-line notes block
+    if (trimmed === '---'){ inNotes = true; noteBuf = []; continue; }
 
     let m;
     if ((m = raw.match(/^(#{1,3})\s+(.+?)\s*$/))){
@@ -1906,6 +1971,7 @@ function goTo(idx, opts={}){
   focusOnActive({ distance });
   updateMinimap();
   updateNavButtons();
+  remoteSendSlide();
 }
 
 function advance(){
@@ -1917,6 +1983,7 @@ function advance(){
     updateActive();
     updateNavButtons();
     zoomToReveal();
+    remoteSendSlide();
     return;
   }
   if (state.activeIdx < state.nodes.length - 1) goTo(state.activeIdx + 1);
@@ -1931,6 +1998,7 @@ function back(){
     clearRevealHighlight(cur.el);
     if (state.bulletsShown > 0) zoomToReveal(false);
     else focusOnActive({ distance:0 });
+    remoteSendSlide();
     return;
   }
   if (state.activeIdx > 0) goTo(state.activeIdx - 1, { reveal:'all' });
@@ -2012,7 +2080,7 @@ function updateNavButtons(){
 }
 
 // ── Persistence ──────────────────────────────────────────────
-const APP_VERSION = '2.16.0';
+const APP_VERSION = '2.17.0';
 const STORAGE_KEY = 'demka.md';
 const IMG_KEY_PREFIX = 'demka.img.';
 
@@ -2079,6 +2147,7 @@ function timerTick(){
   _timerSlide++;
   timerTotalEl.textContent = fmtTime(_timerTotal);
   timerSlideEl.textContent = fmtTime(_timerSlide);
+  remoteSendTimer();
 }
 function timerStart(){
   _timerTotal = 0; _timerSlide = 0;
@@ -2116,6 +2185,7 @@ function togglePresent(){
   }
   updateActive();
   focusOnActive({ distance:1 });
+  remoteSendSettings();
 }
 
 function showHint(){
@@ -2334,6 +2404,7 @@ document.addEventListener('fullscreenchange', ()=>{
 
 // ── Remote control ───────────────────────────────────────────
 let remotePeer = null;
+let remoteConn = null;
 
 function loadPeerJS(cb){
   if (window.Peer){ cb(); return; }
@@ -2345,6 +2416,54 @@ function loadPeerJS(cb){
 }
 
 function remoteUID(){ return 'demka-' + Math.random().toString(36).slice(2,8); }
+
+function remoteSendSlide(){
+  if (!remoteConn?.open) return;
+  const node = state.nodes[state.activeIdx];
+  const tot = node ? totalRevealSteps(node) : 0;
+  remoteConn.send(JSON.stringify({
+    type: 'slide',
+    title: node?.text || '',
+    notes: node?.notes || '',
+    index: state.activeIdx + 1,
+    total: state.nodes.length,
+    bulletsShown: state.bulletsShown,
+    bulletsTotal: tot
+  }));
+}
+
+function remoteSendTimer(){
+  if (!remoteConn?.open) return;
+  remoteConn.send(JSON.stringify({
+    type: 'timer',
+    enabled: timerCheck.checked,
+    total: _timerTotal,
+    slide: _timerSlide
+  }));
+}
+
+function remoteSendSettings(){
+  if (!remoteConn?.open) return;
+  remoteConn.send(JSON.stringify({
+    type: 'settings',
+    reveal: state.revealEnabled,
+    zoom: state.zoomEnabled,
+    cards: cardsCheck.checked,
+    timer: timerCheck.checked,
+    presenting: state.present
+  }));
+}
+
+function handleRemoteCommand(d){
+  if (d === 'next')          { advance(); }
+  else if (d === 'prev')     { back(); }
+  else if (d === 'toggleReveal'){ revealCheck.checked = !revealCheck.checked; revealCheck.dispatchEvent(new Event('change')); }
+  else if (d === 'toggleZoom')  { zoomCheck.checked   = !zoomCheck.checked;   zoomCheck.dispatchEvent(new Event('change')); }
+  else if (d === 'toggleCards') { cardsCheck.checked  = !cardsCheck.checked;  cardsCheck.dispatchEvent(new Event('change')); }
+  else if (d === 'toggleTimer') { timerCheck.checked  = !timerCheck.checked;  timerCheck.dispatchEvent(new Event('change')); }
+  else if (d === 'present')     { if (!state.present) togglePresent(); }
+  else if (d === 'stopPresent') { if (state.present)  togglePresent(); }
+}
 
 function openRemoteModal(){
   $('#remote-modal').classList.add('show');
@@ -2364,11 +2483,18 @@ function openRemoteModal(){
       $('#remote-session-id').textContent = id;
     });
     remotePeer.on('connection', conn => {
+      remoteConn = conn;
       $('#remote-dot').classList.add('on');
       remoteStatusKey = 'remoteConnected';
       $('#remote-status-text').textContent = STRINGS[lang].remoteConnected;
-      conn.on('data', d => { if (d==='next') advance(); else if (d==='prev') back(); });
+      conn.on('open', () => {
+        remoteSendSlide();
+        remoteSendTimer();
+        remoteSendSettings();
+      });
+      conn.on('data', d => handleRemoteCommand(d));
       conn.on('close', () => {
+        remoteConn = null;
         $('#remote-dot').classList.remove('on');
         remoteStatusKey = 'remoteDisconnected';
         $('#remote-status-text').textContent = STRINGS[lang].remoteDisconnected;
@@ -2392,10 +2518,59 @@ window.addEventListener('beforeunload', () => { if (remotePeer) remotePeer.destr
   if (!hostId) return;
   document.body.classList.add('phone-mode');
   $('#phone-status-text').textContent = STRINGS[lang].phoneConnecting;
+
+  let currentConn = null;
+  function sendCmd(cmd){ if (currentConn?.open) currentConn.send(cmd); }
+
+  // Toggle buttons
+  $('#pt-reveal').addEventListener('click', () => sendCmd('toggleReveal'));
+  $('#pt-zoom').addEventListener('click',   () => sendCmd('toggleZoom'));
+  $('#pt-cards').addEventListener('click',  () => sendCmd('toggleCards'));
+  $('#pt-timer').addEventListener('click',  () => sendCmd('toggleTimer'));
+  $('#phone-next').addEventListener('click', () => sendCmd('next'));
+  $('#phone-prev').addEventListener('click', () => sendCmd('prev'));
+
+  const presentBtn = $('#phone-present-btn');
+  let isPresenting = false;
+  presentBtn.addEventListener('click', () => sendCmd(isPresenting ? 'stopPresent' : 'present'));
+
+  function updateSlide(msg){
+    $('#phone-slide-title').textContent = msg.title || '';
+    const notes = msg.notes || '';
+    $('#phone-slide-notes').textContent = notes.length > 280 ? notes.slice(0, 280) + '…' : notes;
+    const infoRow = $('#phone-info-row');
+    const counterEl = $('#pt-counter');
+    if (msg.total > 0){
+      infoRow.style.display = '';
+      let html = `${msg.index}/${msg.total}`;
+      if (msg.bulletsTotal > 0) html += `<br>${msg.bulletsShown}/${msg.bulletsTotal}`;
+      counterEl.innerHTML = html;
+    }
+  }
+
+  function updateTimer(msg){
+    const timerBlock = $('#pt-timer-block');
+    timerBlock.style.display = msg.enabled ? '' : 'none';
+    if (msg.enabled){
+      $('#phone-info-row').style.display = '';
+      $('#pt-total').textContent = fmtTime(msg.total);
+      $('#pt-slide').textContent = fmtTime(msg.slide);
+    }
+  }
+
+  function updateSettings(msg){
+    $('#pt-reveal').classList.toggle('on', msg.reveal);
+    $('#pt-zoom').classList.toggle('on', msg.zoom);
+    $('#pt-cards').classList.toggle('on', msg.cards);
+    $('#pt-timer').classList.toggle('on', msg.timer);
+    isPresenting = msg.presenting;
+    presentBtn.classList.toggle('presenting', msg.presenting);
+    presentBtn.textContent = msg.presenting ? '⏹ Stop' : '▶ Present';
+  }
+
   loadPeerJS(() => {
     const peer = new Peer();
     peer.on('open', () => {
-      let currentConn = null;
       let poll = null;
       let retryTimer = null;
 
@@ -2424,7 +2599,14 @@ window.addEventListener('beforeunload', () => { if (remotePeer) remotePeer.destr
         }
 
         conn.on('open', markConnected);
-        conn.on('data', d => { if (d === 'connected') markConnected(); });
+        conn.on('data', d => {
+          if (d === 'connected'){ markConnected(); return; }
+          let msg;
+          try { msg = JSON.parse(d); } catch(e) { return; }
+          if (msg.type === 'slide')    updateSlide(msg);
+          else if (msg.type === 'timer')    updateTimer(msg);
+          else if (msg.type === 'settings') updateSettings(msg);
+        });
         poll = setInterval(() => { if (conn.open){ markConnected(); clearInterval(poll); } }, 200);
         setTimeout(() => clearInterval(poll), 30000);
 
@@ -2434,6 +2616,7 @@ window.addEventListener('beforeunload', () => { if (remotePeer) remotePeer.destr
 
         conn.on('close', () => {
           marked = false;
+          currentConn = null;
           clearTimeout(retryTimer);
           clearInterval(poll);
           $('#phone-dot').classList.remove('on');
@@ -2444,8 +2627,6 @@ window.addEventListener('beforeunload', () => { if (remotePeer) remotePeer.destr
 
       attemptConnect();
       $('#phone-retry').addEventListener('click', attemptConnect);
-      $('#phone-next').addEventListener('click', () => { if (currentConn?.open) currentConn.send('next'); });
-      $('#phone-prev').addEventListener('click', () => { if (currentConn?.open) currentConn.send('prev'); });
     });
     peer.on('error', err => { $('#phone-status-text').textContent = 'Error: ' + err.type; });
   });
@@ -2779,6 +2960,7 @@ const cardsCheck = $('#cards-check');
 cardsCheck.addEventListener('change', () => {
   document.body.classList.toggle('no-cards', !cardsCheck.checked);
   localStorage.setItem('demka.cards', cardsCheck.checked ? 'on' : 'off');
+  remoteSendSettings();
 });
 
 // ── Reveal toggle ────────────────────────────────────────────
@@ -2790,6 +2972,7 @@ const revealCheck = $('#reveal-check');
 revealCheck.addEventListener('change', () => {
   state.revealEnabled = revealCheck.checked;
   localStorage.setItem('demka.reveal', revealCheck.checked ? 'on' : 'off');
+  remoteSendSettings();
 });
 
 // ── Zoom toggle ───────────────────────────────────────────────
@@ -2801,6 +2984,7 @@ const zoomCheck = $('#zoom-check');
 zoomCheck.addEventListener('change', () => {
   state.zoomEnabled = zoomCheck.checked;
   localStorage.setItem('demka.zoom', zoomCheck.checked ? 'on' : 'off');
+  remoteSendSettings();
 });
 
 // ── Timer toggle ──────────────────────────────────────────────
@@ -2812,6 +2996,7 @@ const timerCheck = $('#timer-check');
 timerCheck.addEventListener('change', () => {
   localStorage.setItem('demka.timer', timerCheck.checked ? 'on' : 'off');
   if (!timerCheck.checked && timerEl) timerEl.style.display = 'none';
+  remoteSendSettings();
 });
 
 // ── Screen recorder ───────────────────────────────────────────
