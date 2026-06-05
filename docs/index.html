@@ -2447,22 +2447,23 @@ const ICE_CFG = { iceServers: [
   { urls: 'stun:stun1.l.google.com:19302' }
 ]};
 
-// Use the same Firebase SDK + App Check instance as the share feature
+// Use the same Firebase SDK + App Check instance as the share feature.
+// Documents live in 'shares' with rtc- prefix so they don't collide with real shares.
 async function fsWrite(code, fields){
   const { db, doc, setDoc } = await getFirebase();
-  await setDoc(doc(db, 'clicker', code), fields);
+  await setDoc(doc(db, 'shares', 'rtc-' + code), fields);
 }
 async function fsRead(code){
   try {
     const { db, doc, getDoc } = await getFirebase();
-    const snap = await getDoc(doc(db, 'clicker', code));
+    const snap = await getDoc(doc(db, 'shares', 'rtc-' + code));
     return snap.exists() ? snap.data() : null;
   } catch(e){ return null; }
 }
 async function fsDelete(code){
   try {
     const { db, doc, deleteDoc } = await getFirebase();
-    await deleteDoc(doc(db, 'clicker', code));
+    await deleteDoc(doc(db, 'shares', 'rtc-' + code));
   } catch(e){}
 }
 
