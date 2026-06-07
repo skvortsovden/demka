@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.19.6] - 2026-06-07
+
+### Removed
+- Phone clicker: Reveal, Zoom, Cards, and Timer toggle buttons removed from the clicker top bar
+
+---
+
 ## [2.19.5] - 2026-06-07
 
 ### Changed

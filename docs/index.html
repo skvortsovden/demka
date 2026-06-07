@@ -401,12 +401,7 @@
     letter-spacing:.05em;text-transform:uppercase;padding:5px 10px;border-radius:3px;
     cursor:pointer;-webkit-tap-highlight-color:transparent;flex-shrink:0}
   .phone-retry.show{display:inline-block}
-  .phone-toggles{display:flex;gap:18px;flex-shrink:0}
-  .phone-toggle{appearance:none;border:none;background:transparent;cursor:pointer;
-    padding:2px;font-size:15px;color:rgba(255,255,255,.22);
-    -webkit-tap-highlight-color:transparent;transition:color 120ms}
-  .phone-toggle.on{color:#fff}
-  .phone-present-btn{appearance:none;flex-shrink:0;
+.phone-present-btn{appearance:none;flex-shrink:0;
     border:1px solid rgba(255,255,255,.25);background:transparent;
     color:rgba(255,255,255,.8);font:600 12px/1 var(--font);
     padding:7px 13px;border-radius:4px;cursor:pointer;
@@ -888,12 +883,6 @@
       <span class="phone-status-text" id="phone-status-text">Connecting…</span>
       <button class="phone-retry" id="phone-retry">↺ Retry</button>
     </div>
-    <div class="phone-toggles">
-      <button class="phone-toggle" id="pt-reveal" title="Reveal">✦</button>
-      <button class="phone-toggle" id="pt-zoom" title="Zoom">⊕</button>
-      <button class="phone-toggle" id="pt-cards" title="Cards">⧉</button>
-      <button class="phone-toggle" id="pt-timer" title="Timer">⏱</button>
-    </div>
     <button class="phone-present-btn" id="phone-present-btn">▶ Present</button>
   </div>
   <div class="phone-info-row" id="phone-info-row" style="display:none">
@@ -1157,10 +1146,6 @@ const STRINGS = {
       edHide: 'Hide editor',
       edShow: 'Show editor',
       overviewBtn: 'Overview — fit all (0)',
-      ptReveal: 'Reveal',
-      ptZoom: 'Zoom',
-      ptCards: 'Cards',
-      ptTimer: 'Timer',
     },
   },
   uk: {
@@ -1270,10 +1255,6 @@ const STRINGS = {
       edHide: 'Сховати редактор',
       edShow: 'Показати редактор',
       overviewBtn: 'Огляд — вписати все (0)',
-      ptReveal: 'Сходи',
-      ptZoom: 'Зум',
-      ptCards: 'Картки',
-      ptTimer: 'Таймер',
     },
   },
 };
@@ -1367,10 +1348,6 @@ function applyLang(){
   $('#ed-hide-btn').title    = t.edHide;
   $('#ed-show-tab').title    = t.edShow;
   $('#overview-btn').title   = t.overviewBtn;
-  $('#pt-reveal').title      = t.ptReveal;
-  $('#pt-zoom').title        = t.ptZoom;
-  $('#pt-cards').title       = t.ptCards;
-  $('#pt-timer').title       = t.ptTimer;
 }
 
 // ── Front matter parser ──────────────────────────────────────
@@ -2189,7 +2166,7 @@ function updateNavButtons(){
 }
 
 // ── Persistence ──────────────────────────────────────────────
-const APP_VERSION = '2.19.5';
+const APP_VERSION = '2.19.6';
 const STORAGE_KEY = 'demka.md';
 const IMG_KEY_PREFIX = 'demka.img.';
 
@@ -2716,10 +2693,6 @@ window.addEventListener('beforeunload', () => { clearInterval(_hostPollTimer); i
   function sendCmd(cmd){ if (currentChannel?.readyState === 'open') currentChannel.send(cmd); }
 
   // Wire buttons (safe to do early — sendCmd guards readyState)
-  $('#pt-reveal').addEventListener('click', () => sendCmd('toggleReveal'));
-  $('#pt-zoom').addEventListener('click',   () => sendCmd('toggleZoom'));
-  $('#pt-cards').addEventListener('click',  () => sendCmd('toggleCards'));
-  $('#pt-timer').addEventListener('click',  () => sendCmd('toggleTimer'));
   $('#phone-next').addEventListener('click', () => sendCmd('next'));
   $('#phone-prev').addEventListener('click', () => sendCmd('prev'));
   const presentBtn = $('#phone-present-btn');
@@ -2746,10 +2719,6 @@ window.addEventListener('beforeunload', () => { clearInterval(_hostPollTimer); i
     }
   }
   function updateSettings(msg){
-    $('#pt-reveal').classList.toggle('on', msg.reveal);
-    $('#pt-zoom').classList.toggle('on', msg.zoom);
-    $('#pt-cards').classList.toggle('on', msg.cards);
-    $('#pt-timer').classList.toggle('on', msg.timer);
     isPresenting = msg.presenting;
     presentBtn.classList.toggle('presenting', msg.presenting);
     presentBtn.textContent = msg.presenting ? '⏹ Stop' : '▶ Present';
