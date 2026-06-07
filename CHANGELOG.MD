@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.19.7] - 2026-06-07
+
+### Changed
+- Phone clicker: connection status (dot + text) moved below the toolbar and centered horizontally
+- Phone clicker: Retry button stays in the top-left corner of the toolbar when disconnected
+
+---
+
 ## [2.19.6] - 2026-06-07
 
 ### Removed
