@@ -2583,6 +2583,17 @@ window.addEventListener('beforeunload', () => { clearInterval(_hostPollTimer); i
 
   document.body.classList.add('phone-mode');
 
+  // Keep screen awake while acting as clicker
+  let _wakeLock = null;
+  async function acquireWakeLock(){
+    if (!navigator.wakeLock) return;
+    try { _wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
+  }
+  acquireWakeLock();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') acquireWakeLock();
+  });
+
   let currentChannel = null;
   let _phonePC = null; // keep reference so iOS Safari doesn't GC the connection
   function sendCmd(cmd){ if (currentChannel?.readyState === 'open') currentChannel.send(cmd); }
