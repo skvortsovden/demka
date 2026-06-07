@@ -2750,7 +2750,7 @@ window.addEventListener('beforeunload', () => { clearInterval(_hostPollTimer); i
     if (_phonePC){ try { _phonePC.close(); } catch(e){} _phonePC = null; }
     try {
       const doc = await fsRead(code);
-      if (!doc?.offer){ setStatus('Code not found — refresh presenter and retry'); $('#phone-retry').classList.add('show'); return; }
+      if (!doc?.offer){ setStatus('Code not found — open slides and scan new QR code'); $('#phone-retry').classList.add('show'); return; }
 
       setStatus('Negotiating…');
       const pc = new RTCPeerConnection(ICE_CFG);
